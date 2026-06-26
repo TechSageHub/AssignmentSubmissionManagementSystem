@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: assignment-submission-system
+    env: node
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
+    startCommand: cd backend && node index.js
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_VERSION
+        value: 22.x
+      - key: DB_TYPE
+        value: postgres
+      - key: DB_HOST
+        fromDatabase:
+          name: assignment-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: assignment-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: assignment-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: assignment-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: assignment-db
+          property: password
+      - key: DB_SSL
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: UPLOAD_PATH
+        value: uploads
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+
+databases:
+  - name: assignment-db
+    databaseName: assignmentsystem
+    region: oregon
+    plan: free
+    ipAllowList: []
