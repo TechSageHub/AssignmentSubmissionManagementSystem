@@ -58,37 +58,44 @@ app.use((err, req, res, _next) => {
   });
 });
 
-reminderService.start();
+// Only start the server when run directly (not when imported by Vercel)
+if (require.main === module) {
+  if (process.env.VERCEL !== '1') {
+    reminderService.start();
+  }
 
-// Detect ngrok URL from local API (runs alongside ngrok CLI)
-function detectNgrokUrl() {
-  return new Promise((resolve) => {
-    http.get('http://127.0.0.1:4040/api/tunnels', (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const tunnels = JSON.parse(data).tunnels;
-          const httpsTunnel = tunnels.find((t) => t.public_url?.startsWith('https'));
-          resolve(httpsTunnel?.public_url || null);
-        } catch {
-          resolve(null);
-        }
-      });
-    }).on('error', () => resolve(null));
+  // Detect ngrok URL from local API (runs alongside ngrok CLI)
+  async function detectNgrokUrl() {
+    return new Promise((resolve) => {
+      http.get('http://127.0.0.1:4040/api/tunnels', (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const tunnels = JSON.parse(data).tunnels;
+            const httpsTunnel = tunnels.find((t) => t.public_url?.startsWith('https'));
+            resolve(httpsTunnel?.public_url || null);
+          } catch {
+            resolve(null);
+          }
+        });
+      }).on('error', () => resolve(null));
+    });
+  }
+
+  app.listen(config.port, async () => {
+    console.log(`Server running on port ${config.port}`);
+
+    if (process.env.NGROK_URL) {
+      console.log(`Public URL: ${process.env.NGROK_URL}`);
+    } else {
+      const url = await detectNgrokUrl();
+      if (url) {
+        process.env.NGROK_URL = url;
+        console.log(`Public URL: ${url}`);
+      }
+    }
   });
 }
 
-app.listen(config.port, async () => {
-  console.log(`Server running on port ${config.port}`);
-
-  if (process.env.NGROK_URL) {
-    console.log(`🌍 Public URL: ${process.env.NGROK_URL}`);
-  } else {
-    const url = await detectNgrokUrl();
-    if (url) {
-      process.env.NGROK_URL = url;
-      console.log(`🌍 Public URL: ${url}`);
-    }
-  }
-});
+module.exports = app;
