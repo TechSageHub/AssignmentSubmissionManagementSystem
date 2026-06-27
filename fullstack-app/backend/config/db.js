@@ -74,7 +74,7 @@ function convertPgSql(sql, params) {
       return `${deletePart} ${wherePart} RETURNING ${returning}`;
     }
   );
-  s = s.replace(/\bGETDATE\(\)\b/gi, 'NOW()');
+  s = s.replace(/\bGETDATE\(\)/gi, 'NOW()');
   s = s.replace(/\b(is_active|is_verified|is_late|is_read)\s*=\s*1\b/gi, '$1 = true');
   s = s.replace(/\b(is_active|is_verified|is_late|is_read)\s*=\s*0\b/gi, '$1 = false');
   s = s.replace(/\[(\w+)\]/g, '"$1"');
