@@ -122,7 +122,7 @@ async function findByIdWithEmail(id) {
 }
 
 async function updatePassword(id, newPassword) {
-  const bcrypt = require('bcrypt');
+  const bcrypt = require('bcryptjs');
   const hash = await bcrypt.hash(newPassword, 10);
   await query(
     'UPDATE Users SET password_hash = @hash, verification_token = NULL, verification_token_expires = NULL WHERE id = @id',
