@@ -25,10 +25,7 @@ export default function HomePage() {
             <Link to="/about" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">About</Link>
             <Link to="/contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Contact</Link>
             <Link to="/login">
-              <Button variant="ghost" size="sm" className="text-sm">Sign In</Button>
-            </Link>
-            <Link to="/register">
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-sm shadow-sm">Get Started</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-sm shadow-sm">Sign In</Button>
             </Link>
           </nav>
         </div>
@@ -54,9 +51,9 @@ export default function HomePage() {
               A centralized platform for students and lecturers at Federal Polytechnic Ilaro to create, submit, grade, and manage academic assignments efficiently.
             </p>
             <div className="mt-10 flex items-center justify-center gap-4">
-              <Link to="/register">
+              <Link to="/login">
                 <Button size="lg" className="bg-indigo-600 hover:bg-indigo-500 text-base shadow-lg shadow-indigo-500/25 h-12 px-8">
-                  Get Started Free
+                  Sign In
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
@@ -159,17 +156,12 @@ export default function HomePage() {
       <section className="bg-indigo-600 py-16">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold tracking-tight text-white">Ready to Get Started?</h2>
-          <p className="mt-4 text-lg text-indigo-100">Join the Federal Polytechnic Ilaro Assignment Submission System today.</p>
+          <p className="mt-4 text-lg text-indigo-100">Sign in to the Federal Polytechnic Ilaro Assignment Submission System. Accounts are provided by your department administrator.</p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            <Link to="/register">
-              <Button size="lg" className="bg-white text-indigo-600 hover:bg-indigo-50 h-12 px-8 text-base shadow-lg">
-                Create Account
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
             <Link to="/login">
-              <Button size="lg" variant="outline" className="border-indigo-400 bg-transparent text-white hover:bg-white/10 h-12 px-8 text-base">
+              <Button size="lg" className="bg-white text-indigo-600 hover:bg-indigo-50 h-12 px-8 text-base shadow-lg">
                 Sign In
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
           </div>
@@ -188,7 +180,6 @@ export default function HomePage() {
               <Link to="/about" className="hover:text-white transition-colors">About</Link>
               <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
               <Link to="/login" className="hover:text-white transition-colors">Login</Link>
-              <Link to="/register" className="hover:text-white transition-colors">Register</Link>
             </div>
             <p>&copy; {new Date().getFullYear()} Federal Polytechnic Ilaro. All rights reserved.</p>
           </div>

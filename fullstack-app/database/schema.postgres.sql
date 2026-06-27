@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS Users (
     programme VARCHAR(100),
     level VARCHAR(20),
     phone VARCHAR(20),
+    must_change_password BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

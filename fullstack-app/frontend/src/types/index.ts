@@ -12,6 +12,7 @@ export interface User {
   phone?: string
   is_active?: boolean
   is_verified?: boolean
+  mustChangePassword?: boolean
   created_at?: string
 }
 
@@ -21,6 +22,7 @@ export interface AuthResponse {
   email: string
   username?: string
   role: 'student' | 'lecturer' | 'admin'
+  mustChangePassword?: boolean
   token: string
 }
 
@@ -29,11 +31,11 @@ export interface LoginCredentials {
   password: string
 }
 
-export interface RegisterData {
+export interface CreateUserData {
   name: string
   email: string
   password: string
-  role: 'student' | 'lecturer'
+  role: 'student' | 'lecturer' | 'admin'
   username?: string
   studentId?: string
   staffId?: string

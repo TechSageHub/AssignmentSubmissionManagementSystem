@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, type ReactNode } from 'react'
-import type { User, LoginCredentials, RegisterData, AuthResponse } from '@/types'
+import type { User, LoginCredentials, AuthResponse } from '@/types'
 import api from '@/services/api'
 
 interface AuthContextType {
@@ -7,7 +7,7 @@ interface AuthContextType {
   token: string | null
   loading: boolean
   login: (credentials: LoginCredentials) => Promise<AuthResponse>
-  register: (data: RegisterData) => Promise<void>
+  updateUser: (patch: Partial<User>) => void
   logout: () => void
 }
 
@@ -30,15 +30,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (credentials: LoginCredentials) => {
     const { data } = await api.post('/auth/login', credentials)
+    const loggedInUser = {
+      id: data.id, name: data.name, email: data.email, username: data.username,
+      role: data.role, mustChangePassword: !!data.mustChangePassword,
+    }
     localStorage.setItem('token', data.token)
-    localStorage.setItem('user', JSON.stringify({ id: data.id, name: data.name, email: data.email, username: data.username, role: data.role }))
+    localStorage.setItem('user', JSON.stringify(loggedInUser))
     setToken(data.token)
-    setUser({ id: data.id, name: data.name, email: data.email, username: data.username, role: data.role })
+    setUser(loggedInUser)
     return data
   }
 
-  const register = async (data: RegisterData) => {
-    await api.post('/auth/register', data)
+  const updateUser = (patch: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, ...patch }
+      localStorage.setItem('user', JSON.stringify(next))
+      return next
+    })
   }
 
   const logout = () => {
@@ -49,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   )

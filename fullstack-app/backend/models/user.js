@@ -21,7 +21,7 @@ async function findByEmailOrUsername(login) {
 async function findById(id) {
   const result = await query(
     `SELECT id, name, email, username, role, is_verified, is_active, is_verified,
-            student_id, staff_id, department, programme, level, phone, created_at
+            student_id, staff_id, department, programme, level, phone, must_change_password, created_at
      FROM Users WHERE id = @id`,
     { id }
   );
@@ -34,7 +34,7 @@ function generateUsername(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.{2,}/g, '.').replace(/^\.|\.$/g, '');
 }
 
-async function createUser({ name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone }) {
+async function createUser({ name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChangePassword = false }) {
   if (!username) {
     username = generateUsername(name);
     const existing = await findByUsername(username);
@@ -44,11 +44,12 @@ async function createUser({ name, email, passwordHash, role, username, studentId
   }
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const mustChange = mustChangePassword ? 1 : 0;
   const result = await query(
-    `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, verification_token, verification_token_expires)
+    `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, must_change_password, verification_token, verification_token_expires)
      OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.username, INSERTED.created_at, INSERTED.verification_token
-     VALUES (@name, @email, @passwordHash, @role, @username, @studentId, @staffId, @department, @programme, @level, @phone, @token, @expires)`,
-    { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, token, expires }
+     VALUES (@name, @email, @passwordHash, @role, @username, @studentId, @staffId, @department, @programme, @level, @phone, @mustChange, @token, @expires)`,
+    { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChange, token, expires }
   );
   return result.recordset[0];
 }
@@ -125,7 +126,7 @@ async function updatePassword(id, newPassword) {
   const bcrypt = require('bcryptjs');
   const hash = await bcrypt.hash(newPassword, 10);
   await query(
-    'UPDATE Users SET password_hash = @hash, verification_token = NULL, verification_token_expires = NULL WHERE id = @id',
+    'UPDATE Users SET password_hash = @hash, must_change_password = 0, verification_token = NULL, verification_token_expires = NULL WHERE id = @id',
     { hash, id }
   );
 }

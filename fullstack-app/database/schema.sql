@@ -17,6 +17,7 @@ CREATE TABLE Users (
     is_verified BIT DEFAULT 0,
     verification_token NVARCHAR(255),
     verification_token_expires DATETIME2,
+    must_change_password BIT DEFAULT 0,
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE()
 );

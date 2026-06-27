@@ -8,6 +8,7 @@ import {
   ClipboardList,
   PlusCircle,
   FileText,
+  UserPlus,
   LogOut,
   Menu,
   Shield,
@@ -29,6 +30,7 @@ const navItems = [
   { icon: Shield, label: 'Admin Panel', path: '/admin', roles: ['admin'] },
   { icon: ClipboardList, label: 'Assignments', path: '/assignments', roles: ['student', 'lecturer'] },
   { icon: PlusCircle, label: 'Create Assignment', path: '/assignments/new', roles: ['lecturer'] },
+  { icon: UserPlus, label: 'Students', path: '/students', roles: ['lecturer'] },
   { icon: FileText, label: 'My Submissions', path: '/my-submissions', roles: ['student'] },
   { icon: Settings, label: 'Profile', path: '/profile', roles: ['student', 'lecturer'] },
 ]
