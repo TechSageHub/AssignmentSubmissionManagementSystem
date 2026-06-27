@@ -4,9 +4,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { ProtectedRoute, LecturerRoute, AdminRoute } from '@/components/ProtectedRoute'
 import { Toaster } from '@/components/ui/toaster'
 import LoginPage from '@/pages/LoginPage'
-import RegisterPage from '@/pages/RegisterPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import ChangePasswordPage from '@/pages/ChangePasswordPage'
 import DashboardPage from '@/pages/DashboardPage'
 import HomePage from '@/pages/HomePage'
 import AboutPage from '@/pages/AboutPage'
@@ -20,6 +20,7 @@ import MySubmissionsPage from '@/pages/MySubmissionsPage'
 import GradeSubmissionPage from '@/pages/GradeSubmissionPage'
 import ViewSubmissionPage from '@/pages/ViewSubmissionPage'
 import AdminDashboardPage from '@/pages/AdminDashboardPage'
+import LecturerStudentsPage from '@/pages/LecturerStudentsPage'
 import ProfilePage from '@/pages/ProfilePage'
 
 function RootRedirect() {
@@ -38,11 +39,11 @@ function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Protected pages */}
+          <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
 
           <Route path="/assignments" element={<ProtectedRoute><AssignmentsRouterPage /></ProtectedRoute>} />
@@ -61,6 +62,10 @@ function App() {
 
           <Route path="/admin" element={
             <ProtectedRoute><AdminRoute><AdminDashboardPage /></AdminRoute></ProtectedRoute>
+          } />
+
+          <Route path="/students" element={
+            <ProtectedRoute><LecturerRoute><LecturerStudentsPage /></LecturerRoute></ProtectedRoute>
           } />
 
           <Route path="/profile" element={

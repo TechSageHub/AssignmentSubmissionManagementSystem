@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
 import Layout from '@/components/Layout'
+import CreateUserDialog from '@/components/CreateUserDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 import {
   Users,
   ClipboardList,
@@ -16,6 +18,8 @@ import {
   RefreshCw,
   History,
   Activity,
+  UserPlus,
+  Upload,
 } from 'lucide-react'
 
 interface SystemStats {
@@ -54,6 +58,9 @@ export default function AdminDashboardPage() {
   const [showAudit, setShowAudit] = useState(false)
   const [auditLoading, setAuditLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<number | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -77,6 +84,51 @@ export default function AdminDashboardPage() {
       setShowAudit(true)
     } catch { /* ignore */ } finally {
       setAuditLoading(false)
+    }
+  }
+
+  // Parse a simple CSV (no quoted-comma support) into row objects keyed by header.
+  const parseCsv = (text: string) => {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0)
+    if (lines.length < 2) return []
+    const headers = lines[0].split(',').map((h) => h.trim())
+    return lines.slice(1).map((line) => {
+      const cells = line.split(',').map((c) => c.trim())
+      const row: Record<string, string> = {}
+      headers.forEach((h, i) => { row[h] = cells[i] ?? '' })
+      return row
+    })
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setImporting(true)
+      try {
+        const text = await file.text()
+        const rows = parseCsv(text)
+        if (rows.length === 0) {
+          toast.error('CSV is empty or missing a header row.')
+          return
+        }
+        const { data } = await api.post('/admin/users/import', { users: rows })
+        if (data.created > 0) {
+          toast.success(`${data.created} user(s) created. ${data.skipped} skipped.`)
+        } else {
+          toast.error(`No users created. ${data.skipped} skipped.`)
+        }
+        if (data.errors?.length) {
+          console.warn('Import errors:', data.errors)
+          toast.message(`Skipped rows: ${data.errors.map((er: { row: number; reason: string }) => `#${er.row} (${er.reason})`).slice(0, 5).join(', ')}`)
+        }
+        fetchData()
+      } catch (err: unknown) {
+        const msg = (err as { response?: { data?: { details?: string } } })?.response?.data?.details
+        toast.error(msg || 'Import failed')
+      } finally {
+        setImporting(false)
+      }
     }
   }
 
@@ -120,11 +172,35 @@ export default function AdminDashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
           <p className="text-muted-foreground">System overview and user management</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            <Upload className={`mr-2 h-4 w-4 ${importing ? 'animate-pulse' : ''}`} />
+            {importing ? 'Importing...' : 'Import CSV'}
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add User
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      <CreateUserDialog
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        allowedRoles={['student', 'lecturer', 'admin']}
+        onCreated={fetchData}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card) => (
@@ -149,6 +225,9 @@ export default function AdminDashboardPage() {
       <Card className="mt-8">
         <CardHeader>
           <CardTitle>User Management</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            CSV import expects a header row with columns: name, email, password, role, studentId, staffId, department, programme, level, phone.
+          </p>
         </CardHeader>
         <CardContent>
           {loading ? (

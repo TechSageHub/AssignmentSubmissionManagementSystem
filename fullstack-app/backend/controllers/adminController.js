@@ -1,5 +1,6 @@
 const userModel = require('../models/user');
 const auditLog = require('../utils/auditLogger');
+const { provisionUser } = require('./userController');
 
 async function getUsers(req, res, next) {
   try {
@@ -58,6 +59,34 @@ async function toggleUserStatus(req, res, next) {
   }
 }
 
+// POST /admin/users/import — bulk-create users from a parsed CSV (array of row objects).
+async function importUsers(req, res, next) {
+  try {
+    const { users } = req.body;
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ error: 'ValidationError', details: 'No user rows provided' });
+    }
+
+    let created = 0;
+    const errors = [];
+    for (let i = 0; i < users.length; i++) {
+      try {
+        // Admin import path — creator role is 'admin', so any valid role is allowed.
+        await provisionUser(users[i], 'admin');
+        created++;
+      } catch (err) {
+        const reason = err && err.details ? err.details : (err.message || 'Unknown error');
+        errors.push({ row: i + 1, email: users[i]?.email || null, reason });
+      }
+    }
+
+    auditLog.log(req, 'import_users', 'user', null, { total: users.length, created, skipped: errors.length });
+    res.status(201).json({ created, skipped: errors.length, errors });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getSystemStats(req, res, next) {
   try {
     const stats = await userModel.getStats();
@@ -77,4 +106,4 @@ async function getAuditLogs(req, res, next) {
   }
 }
 
-module.exports = { getUsers, getUser, updateUserRole, toggleUserStatus, getSystemStats, getAuditLogs };
+module.exports = { getUsers, getUser, updateUserRole, toggleUserStatus, importUsers, getSystemStats, getAuditLogs };

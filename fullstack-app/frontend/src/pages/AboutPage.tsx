@@ -15,10 +15,7 @@ export default function AboutPage() {
           </Link>
           <nav className="flex items-center gap-4">
             <Link to="/login">
-              <Button variant="ghost" size="sm">Sign In</Button>
-            </Link>
-            <Link to="/register">
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500">Get Started</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500">Sign In</Button>
             </Link>
           </nav>
         </div>

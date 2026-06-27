@@ -5,67 +5,6 @@ const userModel = require('../models/user');
 const { sendEmail } = require('../config/email');
 const auditLog = require('../utils/auditLogger');
 
-async function register(req, res, next) {
-  try {
-    const { name, email, password, role, username, studentId, staffId, department, programme, level, phone } = req.body;
-
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ error: 'ValidationError', details: 'All fields are required' });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'ValidationError', details: 'Invalid email format' });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'ValidationError', details: 'Password must be at least 8 characters' });
-    }
-    if (!['student', 'lecturer'].includes(role)) {
-      return res.status(400).json({ error: 'ValidationError', details: 'Role must be student or lecturer' });
-    }
-
-    const existing = await userModel.findByEmail(email);
-    if (existing) {
-      return res.status(409).json({ error: 'ValidationError', details: 'Email already in use' });
-    }
-    if (username) {
-      const existingUsername = await userModel.findByUsername(username);
-      if (existingUsername) {
-        return res.status(409).json({ error: 'ValidationError', details: 'Username already taken' });
-      }
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await userModel.createUser({
-      name, email, passwordHash, role, username,
-      studentId: role === 'student' ? studentId : null,
-      staffId: role === 'lecturer' ? staffId : null,
-      department, programme, level, phone,
-    });
-
-    const baseUrl = process.env.NGROK_URL || config.frontendUrl;
-    const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${user.verification_token}`;
-    try {
-      await sendEmail({
-        to: email,
-        subject: 'Verify your email',
-        html: `<p>Hi ${name},</p><p>Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>`,
-      });
-    } catch (emailErr) {
-      console.error('Failed to send verification email:', emailErr.message);
-    }
-
-    res.status(201).json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      message: 'Registration successful. Please check your email to verify your account.',
-    });
-  } catch (err) {
-    next(err);
-  }
-}
-
 async function login(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -102,6 +41,7 @@ async function login(req, res, next) {
       email: user.email,
       username: user.username,
       role: user.role,
+      mustChangePassword: user.must_change_password === true || user.must_change_password === 1,
       token,
     });
   } catch (err) {
@@ -227,4 +167,32 @@ async function getMe(req, res) {
   res.json(req.user);
 }
 
-module.exports = { register, login, verifyEmail, resendVerification, forgotPassword, resetPassword, getMe };
+async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Current and new password are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Password must be at least 8 characters' });
+    }
+
+    const user = await userModel.findByEmail(req.user.email);
+    if (!user) {
+      return res.status(404).json({ error: 'NotFound', details: 'User not found' });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'AuthenticationError', details: 'Current password is incorrect' });
+    }
+
+    await userModel.updatePassword(user.id, newPassword);
+    auditLog.log(req, 'change_password', 'user', user.id);
+    res.json({ message: 'Password changed successfully.' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, verifyEmail, resendVerification, forgotPassword, resetPassword, getMe, changePassword };

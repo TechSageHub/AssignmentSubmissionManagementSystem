@@ -15,6 +15,7 @@ const migrations = [
   'migration_004_add_group_submissions.sql',
   'migration_005_add_audit_log.sql',
   'migration_006_add_owner_requirements.sql',
+  'migration_007_add_must_change_password.sql',
 ];
 
 async function runSchema() {
