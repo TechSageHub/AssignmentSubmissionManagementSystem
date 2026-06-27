@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
 import { Eye, EyeOff, GraduationCap, CheckCircle2, BookOpen, Users, ArrowRight } from 'lucide-react'
 
 export default function LoginPage() {
@@ -93,102 +94,104 @@ export default function LoginPage() {
       </div>
 
       {/* Right: Form */}
-      <div className="flex flex-1 items-center justify-center bg-white p-6 lg:p-12">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="mb-10 flex items-center justify-center gap-2 lg:hidden">
-            <img src="/fpi-logo.png" alt="FPI Logo" className="h-9 w-9 rounded-lg bg-indigo-600 object-contain p-1" />
-            <span className="text-lg font-semibold tracking-tight">FPI - ASMS</span>
-          </div>
-
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h2>
-            <p className="mt-1.5 text-sm text-slate-500">Sign in to your account to continue</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {verified && (
-              <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                <div className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
-                {verified}
-              </div>
-            )}
-            {error && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                <div className="h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email or Username</Label>
-              <Input
-                id="email"
-                type="text"
-                placeholder="name@university.edu or username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-11 rounded-lg border-slate-200 bg-slate-50/50 transition-all duration-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                required
-              />
+      <div className="flex flex-1 items-center justify-center bg-slate-50 p-4 lg:p-12">
+        <Card className="w-full max-w-md border-slate-200 shadow-xl">
+          <CardContent className="p-8">
+            {/* Mobile logo */}
+            <div className="mb-8 flex items-center justify-center gap-2 lg:hidden">
+              <img src="/fpi-logo.png" alt="FPI Logo" className="h-9 w-9 rounded-lg bg-indigo-600 object-contain p-1" />
+              <span className="text-lg font-semibold tracking-tight">FPI - ASMS</span>
             </div>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
-                <Link to="/forgot-password" className="text-xs font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
-                  Forgot password?
-                </Link>
-              </div>
-              <div className="relative">
+            <div className="mb-8 text-center">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h2>
+              <p className="mt-1.5 text-sm text-slate-500">Sign in to your account to continue</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {verified && (
+                <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  <div className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
+                  {verified}
+                </div>
+              )}
+              {error && (
+                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                  <div className="h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email or Username</Label>
                 <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 rounded-lg border-slate-200 bg-slate-50/50 pr-10 transition-all duration-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  id="email"
+                  type="text"
+                  placeholder="name@university.edu or username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 rounded-lg border-slate-200 bg-slate-50/50 transition-all duration-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
               </div>
-            </div>
 
-            <Button
-              type="submit"
-              className="h-11 w-full rounded-lg bg-indigo-600 text-sm font-medium shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:bg-indigo-500 hover:shadow-indigo-500/30 active:scale-[0.98]"
-              disabled={loading}
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Signing in...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  Sign In
-                  <ArrowRight className="h-4 w-4" />
-                </span>
-              )}
-            </Button>
-          </form>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
+                  <Link to="/forgot-password" className="text-xs font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-11 rounded-lg border-slate-200 bg-slate-50/50 pr-10 transition-all duration-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
 
-          <p className="mt-8 text-center text-sm text-slate-500">
-            Don't have an account?{' '}
-            <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors">
-              Create one
-            </Link>
-          </p>
-        </div>
+              <Button
+                type="submit"
+                className="h-11 w-full rounded-lg bg-indigo-600 text-sm font-medium shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:bg-indigo-500 hover:shadow-indigo-500/30 active:scale-[0.98]"
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Signing in...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    Sign In
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                )}
+              </Button>
+            </form>
+
+            <p className="mt-8 text-center text-sm text-slate-500">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors">
+                Create one
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
