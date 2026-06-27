@@ -60,11 +60,20 @@ function convertPgSql(sql, params) {
     values.push(params[key]);
   }
 
-  s = s.replace(/\bOUTPUT\s+INSERTED\.\*\b/gi, 'RETURNING *');
-  s = s.replace(/\bOUTPUT\s+INSERTED\.(\w+(?:,\s*INSERTED\.\w+)*)\b/gi, (_, cols) => {
-    return 'RETURNING ' + cols.replace(/INSERTED\./gi, '');
-  });
-  s = s.replace(/\bOUTPUT\s+DELETED\.(\w+)\b/gi, 'RETURNING $1');
+  s = s.replace(
+    /(INSERT\s+INTO\s+\S+(?:\s*\([^)]*\))?)\s*OUTPUT\s+(INSERTED\.\*|(?:INSERTED\.\w+(?:\s*,\s*INSERTED\.\w+)*))\s+(VALUES\s*\(.*\))/gi,
+    (_, insertPart, outputCols, valuesPart) => {
+      const returning = outputCols.replace(/\bINSERTED\./gi, '');
+      return `${insertPart} ${valuesPart} RETURNING ${returning}`;
+    }
+  );
+  s = s.replace(
+    /(DELETE\s+FROM\s+\S+)\s+OUTPUT\s+(DELETED\.\w+)\s+(WHERE\s+.*)/gi,
+    (_, deletePart, outputCols, wherePart) => {
+      const returning = outputCols.replace(/\bDELETED\./gi, '');
+      return `${deletePart} ${wherePart} RETURNING ${returning}`;
+    }
+  );
   s = s.replace(/\bGETDATE\(\)\b/gi, 'NOW()');
   s = s.replace(/\b(is_active|is_verified|is_late|is_read)\s*=\s*1\b/gi, '$1 = true');
   s = s.replace(/\b(is_active|is_verified|is_late|is_read)\s*=\s*0\b/gi, '$1 = false');
