@@ -32,7 +32,7 @@ export default function AboutPage() {
             </Link>
             <h1 className="text-4xl font-bold tracking-tight text-slate-900">About the System</h1>
             <p className="mt-4 text-lg text-slate-600 leading-relaxed">
-              The Federal Polytechnic Ilaro Assignment Submission System is a web-based platform designed to digitize and streamline the entire assignment lifecycle — from creation and submission to grading and feedback.
+              The Federal Polytechnic Ilaro Assignment Submission System is a web-based platform designed to digitize and streamline the entire assignment lifecycle, from creation and submission to grading and feedback.
             </p>
           </div>
         </section>
@@ -48,8 +48,8 @@ export default function AboutPage() {
               </div>
               <p className="text-slate-600 leading-relaxed">
                 The system provides a centralized digital platform for students and lecturers at Federal Polytechnic Ilaro
-                to manage the complete lifecycle of academic assignments. It replaces fragmented manual processes — paper submissions,
-                email chains, and messaging platforms — with a secure, organized, and efficient digital workflow.
+                to manage the complete lifecycle of academic assignments. It replaces fragmented manual processes such as paper
+                submissions, email chains, and messaging platforms with a secure, organized, and efficient digital workflow.
               </p>
             </div>
 
