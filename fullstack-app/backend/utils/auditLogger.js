@@ -1,13 +1,14 @@
 const { query } = require('../config/db');
 
-async function log(req, action, entityType, entityId, details) {
+async function log(req, action, entityType, entityId, details, actor) {
   try {
+    const auditUser = actor || req.user || null;
     await query(
       `INSERT INTO AuditLog (user_id, user_name, action, entity_type, entity_id, details, ip_address)
        VALUES (@userId, @userName, @action, @entityType, @entityId, @details, @ip)`,
       {
-        userId: req.user?.id || null,
-        userName: req.user?.name || 'anonymous',
+        userId: auditUser?.id || null,
+        userName: auditUser?.name || 'anonymous',
         action,
         entityType: entityType || null,
         entityId: entityId || null,

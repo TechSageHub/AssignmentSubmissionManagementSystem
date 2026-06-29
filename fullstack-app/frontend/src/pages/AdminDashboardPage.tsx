@@ -24,6 +24,7 @@ import {
 
 interface SystemStats {
   users: { role: string; count: number }[]
+  totalUsers: number
   totalAssignments: number
   totalSubmissions: number
   totalGrades: number
@@ -157,7 +158,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const totalUsers = stats?.users?.reduce((sum, u) => sum + u.count, 0) ?? 0
+  const totalUsers = stats?.totalUsers ?? stats?.users?.reduce((sum, u) => sum + u.count, 0) ?? 0
   const statCards = [
     { title: 'Total Users', value: totalUsers, icon: Users, color: 'text-indigo-600 bg-indigo-50' },
     { title: 'Assignments', value: stats?.totalAssignments ?? 0, icon: ClipboardList, color: 'text-blue-600 bg-blue-50' },

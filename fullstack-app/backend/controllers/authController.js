@@ -33,7 +33,7 @@ async function login(req, res, next) {
 
     const token = jwt.sign({ id: user.id }, config.jwtSecret, { expiresIn: '24h' });
 
-    auditLog.log(req, 'login', 'user', user.id, { email });
+    auditLog.log(req, 'login', 'user', user.id, { email }, user);
 
     res.json({
       id: user.id,

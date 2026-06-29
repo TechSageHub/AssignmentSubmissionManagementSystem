@@ -44,7 +44,7 @@ async function createUser({ name, email, passwordHash, role, username, studentId
   }
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const mustChange = mustChangePassword ? 1 : 0;
+  const mustChange = Boolean(mustChangePassword);
   const result = await query(
     `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, must_change_password, verification_token, verification_token_expires)
      OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.username, INSERTED.created_at, INSERTED.verification_token
@@ -96,14 +96,16 @@ async function setActiveStatus(id, isActive) {
 
 async function getStats() {
   const users = await query("SELECT role, COUNT(*) as count FROM Users GROUP BY role");
+  const totalUsers = await query("SELECT COUNT(*) as count FROM Users");
   const assignments = await query("SELECT COUNT(*) as count FROM Assignments");
   const submissions = await query("SELECT COUNT(*) as count FROM Submissions");
   const grades = await query("SELECT COUNT(*) as count FROM Grades");
   return {
-    users: users.recordset,
-    totalAssignments: assignments.recordset[0].count,
-    totalSubmissions: submissions.recordset[0].count,
-    totalGrades: grades.recordset[0].count,
+    users: users.recordset.map((row) => ({ ...row, count: Number(row.count) })),
+    totalUsers: Number(totalUsers.recordset[0].count),
+    totalAssignments: Number(assignments.recordset[0].count),
+    totalSubmissions: Number(submissions.recordset[0].count),
+    totalGrades: Number(grades.recordset[0].count),
   };
 }
 

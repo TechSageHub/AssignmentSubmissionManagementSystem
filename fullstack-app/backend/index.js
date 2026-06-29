@@ -52,9 +52,10 @@ app.use((_req, res) => {
 app.use((err, req, res, _next) => {
   console.error(err);
   const status = err.status || 500;
+  const exposeDetails = status < 500 || process.env.NODE_ENV !== 'production';
   res.status(status).json({
     error: err.name || 'InternalServerError',
-    details: err.message || 'An unexpected error occurred',
+    details: exposeDetails ? (err.message || 'An unexpected error occurred') : 'An unexpected error occurred. Please try again later.',
   });
 });
 
