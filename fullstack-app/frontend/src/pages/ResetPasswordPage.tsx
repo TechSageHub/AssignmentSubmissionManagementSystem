@@ -96,7 +96,7 @@ export default function ResetPasswordPage() {
                   </button>
                 </div>
               </div>
-              <Button type="submit" className="h-11 w-full" disabled={loading}>
+              <Button type="submit" className="h-11 w-full" pending={loading}>
                 {loading ? 'Resetting...' : 'Reset Password'}
               </Button>
             </form>

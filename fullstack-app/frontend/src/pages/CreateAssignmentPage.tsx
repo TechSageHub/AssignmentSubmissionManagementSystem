@@ -113,7 +113,7 @@ export default function CreateAssignmentPage() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" pending={loading}>
                   {loading ? 'Creating...' : 'Create Assignment'}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => navigate('/assignments')}>

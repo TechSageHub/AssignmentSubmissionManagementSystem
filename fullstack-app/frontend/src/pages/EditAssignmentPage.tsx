@@ -115,7 +115,7 @@ export default function EditAssignmentPage() {
                 <Input id="dueDate" type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
               </div>
               <div className="flex gap-3 pt-2">
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" pending={loading}>
                   {loading ? 'Saving...' : 'Save Changes'}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => navigate('/assignments')}>

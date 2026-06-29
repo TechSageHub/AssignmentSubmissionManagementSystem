@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import api from '@/services/api'
+import api, { readApiCache } from '@/services/api'
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', roles: ['student', 'lecturer', 'admin'] },
@@ -66,6 +66,12 @@ export default function Sidebar() {
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return
+    const cachedNotifications = readApiCache<{ notifications: any[]; unreadCount: number }>('/notifications?limit=10')
+    if (cachedNotifications) {
+      setNotifications(cachedNotifications.notifications)
+      setUnreadCount(cachedNotifications.unreadCount)
+    }
+
     try {
       const { data } = await api.get('/notifications?limit=10')
       setNotifications(data.notifications)

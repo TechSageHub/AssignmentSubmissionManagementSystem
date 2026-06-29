@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import api from '@/services/api'
+import api, { readApiCache } from '@/services/api'
+import { toast } from 'sonner'
 import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,19 +15,38 @@ import { Edit3, Eye, Trash2, Plus, Calendar, Users } from 'lucide-react'
 export default function MyAssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
+    const cachedAssignments = readApiCache<Assignment[]>('/assignments')
+    if (cachedAssignments) {
+      setAssignments(cachedAssignments)
+      setLoading(false)
+    }
+
     api.get('/assignments')
       .then(({ data }) => setAssignments(data))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .catch(() => {
+        if (!cachedAssignments) setAssignments([])
+      })
+      .finally(() => {
+        if (!cachedAssignments) setLoading(false)
+      })
   }, [])
 
   const handleDelete = async (id: number) => {
+    const previousAssignments = assignments
+    setDeletingId(id)
+    setAssignments((prev) => prev.filter((a) => a.id !== id))
+
     try {
       await api.delete(`/assignments/${id}`)
-      setAssignments((prev) => prev.filter((a) => a.id !== id))
-    } catch { /* ignore */ }
+    } catch {
+      setAssignments(previousAssignments)
+      toast.error('Could not delete assignment')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   if (loading) {
@@ -95,7 +115,13 @@ export default function MyAssignmentsPage() {
                   </Link>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        disabled={deletingId === a.id}
+                        onClick={() => handleDelete(a.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
@@ -106,7 +132,9 @@ export default function MyAssignmentsPage() {
                       <p className="text-sm text-muted-foreground">Are you sure you want to delete "{a.title}"? This action cannot be undone.</p>
                       <div className="flex justify-end gap-2 mt-4">
                         <Button variant="outline" onClick={() => {}}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => handleDelete(a.id)}>Delete</Button>
+                        <Button variant="destructive" onClick={() => handleDelete(a.id)} disabled={deletingId === a.id}>
+                          {deletingId === a.id ? 'Deleting...' : 'Delete'}
+                        </Button>
                       </div>
                     </DialogContent>
                   </Dialog>

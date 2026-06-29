@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import api from '@/services/api'
+import api, { readApiCache } from '@/services/api'
 import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,10 +22,20 @@ export default function AssignmentsListPage() {
   const [filter, setFilter] = useState('all')
 
   useEffect(() => {
+    const cachedAssignments = readApiCache<AssignmentWithStatus[]>('/assignments')
+    if (cachedAssignments) {
+      setAssignments(cachedAssignments)
+      setLoading(false)
+    }
+
     api.get('/assignments')
       .then(({ data }) => setAssignments(data))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .catch(() => {
+        if (!cachedAssignments) setAssignments([])
+      })
+      .finally(() => {
+        if (!cachedAssignments) setLoading(false)
+      })
   }, [])
 
   const statusBadge = (a: AssignmentWithStatus) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import api from '@/services/api'
+import api, { readApiCache } from '@/services/api'
 import Layout from '@/components/Layout'
 import CreateUserDialog from '@/components/CreateUserDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,17 +18,24 @@ export default function LecturerStudentsPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
 
-  const fetchStudents = async () => {
-    setLoading(true)
+  const fetchStudents = async (showLoading = true) => {
+    const cachedStudents = readApiCache<Student[]>('/users/students')
+    if (cachedStudents) {
+      setStudents(cachedStudents)
+      setLoading(false)
+    } else if (showLoading) {
+      setLoading(true)
+    }
+
     try {
       const { data } = await api.get('/users/students')
       setStudents(data)
     } catch { /* ignore */ } finally {
-      setLoading(false)
+      if (!cachedStudents) setLoading(false)
     }
   }
 
-  useEffect(() => { fetchStudents() }, [])
+  useEffect(() => { fetchStudents(false) }, [])
 
   return (
     <Layout>
@@ -42,7 +49,7 @@ export default function LecturerStudentsPage() {
             <UserPlus className="mr-2 h-4 w-4" />
             Add Student
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchStudents} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => fetchStudents(true)} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>

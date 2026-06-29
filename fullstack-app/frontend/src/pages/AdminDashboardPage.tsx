@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import api from '@/services/api'
+import api, { readApiCache } from '@/services/api'
 import Layout from '@/components/Layout'
 import CreateUserDialog from '@/components/CreateUserDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -63,8 +63,19 @@ export default function AdminDashboardPage() {
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (showLoading = true) => {
+    const cachedStats = readApiCache<SystemStats>('/admin/stats')
+    const cachedUsers = readApiCache<AdminUser[]>('/admin/users')
+    const hasCachedData = Boolean(cachedStats) || Boolean(cachedUsers)
+
+    if (cachedStats) setStats(cachedStats)
+    if (cachedUsers) setUsers(cachedUsers)
+    if (hasCachedData) {
+      setLoading(false)
+    } else if (showLoading) {
+      setLoading(true)
+    }
+
     try {
       const [statsRes, usersRes] = await Promise.all([
         api.get('/admin/stats'),
@@ -133,27 +144,41 @@ export default function AdminDashboardPage() {
     }
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData(false) }, [])
 
   const handleToggleStatus = async (userId: number, userName: string, currentStatus: boolean) => {
     const action = currentStatus ? 'suspend' : 'activate'
     if (!window.confirm(`Are you sure you want to ${action} "${userName}"?`)) return
+
+    const previousUser = users.find((u) => u.id === userId)
+    if (!previousUser) return
+
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_active: !u.is_active } : u)))
     setActionLoading(userId)
     try {
       await api.put(`/admin/users/${userId}/toggle-status`)
-      fetchData()
-    } catch { /* ignore */ } finally {
+    } catch {
+      setUsers((prev) => prev.map((u) => (u.id === userId ? previousUser : u)))
+      toast.error('Could not update user status')
+    } finally {
       setActionLoading(null)
     }
   }
 
   const handleChangeRole = async (userId: number, userName: string, newRole: string) => {
     if (!window.confirm(`Change role of "${userName}" to "${newRole}"?`)) return
+
+    const previousUser = users.find((u) => u.id === userId)
+    if (!previousUser) return
+
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)))
     setActionLoading(userId)
     try {
       await api.put(`/admin/users/${userId}/role`, { role: newRole })
-      fetchData()
-    } catch { /* ignore */ } finally {
+    } catch {
+      setUsers((prev) => prev.map((u) => (u.id === userId ? previousUser : u)))
+      toast.error('Could not update user role')
+    } finally {
       setActionLoading(null)
     }
   }
@@ -189,7 +214,7 @@ export default function AdminDashboardPage() {
             <UserPlus className="mr-2 h-4 w-4" />
             Add User
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -200,7 +225,7 @@ export default function AdminDashboardPage() {
         open={showCreate}
         onOpenChange={setShowCreate}
         allowedRoles={['student', 'lecturer', 'admin']}
-        onCreated={fetchData}
+        onCreated={() => fetchData(false)}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import api from '@/services/api'
+import api, { readApiCache } from '@/services/api'
+import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
 import { Navigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,6 +36,40 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchStats = async () => {
+      const cachedAssignments = readApiCache<Assignment[]>('/assignments')
+      const cachedSubmissions = readApiCache<any[]>(user?.role === 'lecturer' ? '/submissions' : '/submissions/mine')
+
+      if (cachedAssignments) setAssignments(cachedAssignments)
+      if (cachedSubmissions) {
+        if (user?.role === 'lecturer') {
+          setStats({
+            totalAssignments: cachedAssignments?.length ?? 0,
+            totalSubmissions: cachedSubmissions.length,
+            pendingGrading: cachedSubmissions.filter((s: { score?: number | null }) => s.score == null).length,
+            averageScore: cachedSubmissions.filter((s: { score?: number | null }) => s.score != null).length > 0
+              ? Math.round(cachedSubmissions.filter((s: { score?: number | null }) => s.score != null).reduce((a: number, s: { score: number }) => a + s.score, 0) / cachedSubmissions.filter((s: { score?: number | null }) => s.score != null).length)
+              : 0,
+          })
+        } else {
+          const now = new Date()
+          const submittedIds = new Set(cachedSubmissions.map((s: { assignment_id: number }) => s.assignment_id))
+          setStats({
+            pendingAssignments: cachedAssignments?.filter((a: { id: number }) => !submittedIds.has(a.id)).length ?? 0,
+            submittedCount: cachedSubmissions.length,
+            gradedCount: cachedSubmissions.filter((s: { score?: number | null }) => s.score != null).length,
+            overdueCount: cachedAssignments?.filter((a: { id: number; due_date: string }) =>
+              new Date(a.due_date) < now && !submittedIds.has(a.id)
+            ).length ?? 0,
+          })
+        }
+      }
+
+      if (cachedAssignments || cachedSubmissions) {
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
+
       try {
         if (user?.role === 'lecturer') {
           const [assignmentsRes, submissions] = await Promise.all([

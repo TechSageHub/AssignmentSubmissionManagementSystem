@@ -161,7 +161,7 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => handleClose(false)} disabled={loading}>Cancel</Button>
-            <Button type="submit" disabled={loading} className="gap-2">
+            <Button type="submit" pending={loading} className="gap-2">
               <UserPlus className="h-4 w-4" />
               {loading ? 'Creating...' : 'Create User'}
             </Button>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import api from '@/services/api'
+import api, { readApiCache } from '@/services/api'
 import Layout from '@/components/Layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -24,10 +24,20 @@ export default function MySubmissionsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const cachedSubmissions = readApiCache<MySubmission[]>('/submissions/mine')
+    if (cachedSubmissions) {
+      setSubmissions(cachedSubmissions)
+      setLoading(false)
+    }
+
     api.get('/submissions/mine')
       .then(({ data }) => setSubmissions(data))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .catch(() => {
+        if (!cachedSubmissions) setSubmissions([])
+      })
+      .finally(() => {
+        if (!cachedSubmissions) setLoading(false)
+      })
   }, [])
 
   if (loading) {

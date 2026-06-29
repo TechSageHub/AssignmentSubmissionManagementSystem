@@ -115,7 +115,7 @@ export default function ChangePasswordPage() {
               />
             </div>
 
-            <Button type="submit" className="h-11 w-full gap-2" disabled={loading}>
+            <Button type="submit" className="h-11 w-full gap-2" pending={loading}>
               {loading ? 'Saving...' : (<>Change Password <ArrowRight className="h-4 w-4" /></>)}
             </Button>
           </form>
