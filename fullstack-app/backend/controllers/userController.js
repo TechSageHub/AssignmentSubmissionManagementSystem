@@ -53,10 +53,22 @@ async function provisionUser({ name, email, password, role, username, studentId,
     await sendEmail({
       to: email,
       subject: 'Verify your account',
+      text: `Hi ${name},
+
+An account has been created for you on the FPI Assignment Submission System.
+
+Temporary Password: ${password}
+
+Please verify your email by visiting this link: ${verifyUrl}
+This link expires in 24 hours.
+
+After verification, you will be asked to set your own password on first login.
+`,
       html: `<p>Hi ${name},</p>
         <p>An account has been created for you on the FPI Assignment Submission System.</p>
+        <p><strong>Temporary password:</strong> ${password}</p>
         <p>Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>
-        <p>You will be asked to set your own password the first time you log in.</p>`,
+        <p>After verification, you will be asked to set your own password on first login.</p>`,
     });
   } catch (emailErr) {
     console.error('Failed to send verification email:', emailErr.message);

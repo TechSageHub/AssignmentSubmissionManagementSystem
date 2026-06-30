@@ -12,6 +12,17 @@ export function Toaster() {
           borderRadius: "8px",
           fontSize: "14px",
         },
+        success: {
+          iconTheme: {
+            primary: "#10b981",
+            secondary: "#ffffff",
+          },
+          style: {
+            background: "#ecfdf5",
+            color: "#065f46",
+            border: "1px solid #6ee7b7",
+          },
+        },
       }}
     />
   )

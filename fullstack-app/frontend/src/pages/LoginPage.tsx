@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Eye, EyeOff, GraduationCap, CheckCircle2, BookOpen, Users, ArrowRight } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -30,6 +31,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login({ email, password })
+      toast.success('Successfully signed in.')
       navigate('/dashboard')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { details?: string } } })?.response?.data?.details
