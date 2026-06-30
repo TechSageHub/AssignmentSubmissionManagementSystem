@@ -71,8 +71,11 @@ async function importUsers(req, res, next) {
     const errors = [];
     for (let i = 0; i < users.length; i++) {
       try {
-        // Admin import path — creator role is 'admin', so any valid role is allowed.
-        await provisionUser(users[i], 'admin');
+        const row = { ...users[i] };
+        if (req.user.role === 'lecturer') {
+          row.role = 'student';
+        }
+        await provisionUser(row, req.user.role);
         created++;
       } catch (err) {
         const reason = err && err.details ? err.details : (err.message || 'Unknown error');
