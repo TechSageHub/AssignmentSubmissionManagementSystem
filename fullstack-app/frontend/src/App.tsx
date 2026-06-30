@@ -20,6 +20,7 @@ import MySubmissionsPage from '@/pages/MySubmissionsPage'
 import GradeSubmissionPage from '@/pages/GradeSubmissionPage'
 import ViewSubmissionPage from '@/pages/ViewSubmissionPage'
 import AdminDashboardPage from '@/pages/AdminDashboardPage'
+import UserManagementPage from '@/pages/UserManagementPage'
 import LecturerStudentsPage from '@/pages/LecturerStudentsPage'
 import ProfilePage from '@/pages/ProfilePage'
 
@@ -62,6 +63,9 @@ function App() {
 
           <Route path="/admin" element={
             <ProtectedRoute><AdminRoute><AdminDashboardPage /></AdminRoute></ProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <ProtectedRoute><AdminRoute><UserManagementPage /></AdminRoute></ProtectedRoute>
           } />
 
           <Route path="/students" element={

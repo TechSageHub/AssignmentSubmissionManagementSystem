@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '@/hooks/useAuth'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api, { readApiCache } from '@/services/api'
 import Layout from '@/components/Layout'
 import CreateUserDialog from '@/components/CreateUserDialog'
@@ -7,19 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { toast } from 'sonner'
 import {
   Users,
   ClipboardList,
   FileText,
   ShieldCheck,
-  Ban,
-  CheckCircle2,
   RefreshCw,
   History,
   Activity,
   UserPlus,
-  Upload,
 } from 'lucide-react'
 
 interface SystemStats {
@@ -51,17 +47,14 @@ interface AuditEntry {
 }
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth()
+  const navigate = useNavigate()
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [showAudit, setShowAudit] = useState(false)
   const [auditLoading, setAuditLoading] = useState(false)
-  const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [showCreate, setShowCreate] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = async (showLoading = true) => {
     const cachedStats = readApiCache<SystemStats>('/admin/stats')
@@ -99,120 +92,8 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Parse a simple CSV (no quoted-comma support) into row objects keyed by header.
-  const TEMPLATE_HEADERS = ['name', 'email', 'password', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
-
-  const parseCsv = (text: string) => {
-    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0)
-    if (lines.length < 2) return []
-    const headers = lines[0].split(',').map((h) => h.trim())
-    return lines.slice(1).map((line) => {
-      const cells = line.split(',').map((c) => c.trim())
-      const row: Record<string, string> = {}
-      headers.forEach((h, i) => { row[h] = cells[i] ?? '' })
-      return row
-    })
-  }
-
-  const handleDownloadTemplate = () => {
-    const sampleRow = [
-      'John Doe',
-      'john.doe@fpi.edu.ng',
-      'ChangeMe123',
-      'student',
-      'ND/ICT/2024/0001',
-      '',
-      'Computer Science',
-      'Computer Science',
-      'ND I',
-      '08031234567',
-    ]
-
-    const csvRows = [TEMPLATE_HEADERS, sampleRow]
-      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
-      .join('\r\n')
-
-    const blob = new Blob([csvRows], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'user-import-template.csv'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      setImporting(true)
-      try {
-        const text = await file.text()
-        const rows = parseCsv(text)
-        if (rows.length === 0) {
-          toast.error('CSV is empty or missing a header row.')
-          return
-        }
-        const { data } = await api.post('/admin/users/import', { users: rows })
-        if (data.created > 0) {
-          toast.success(`${data.created} user(s) created. ${data.skipped} skipped.`)
-        } else {
-          toast.error(`No users created. ${data.skipped} skipped.`)
-        }
-        if (data.errors?.length) {
-          console.warn('Import errors:', data.errors)
-          toast.message(`Skipped rows: ${data.errors.map((er: { row: number; reason: string }) => `#${er.row} (${er.reason})`).slice(0, 5).join(', ')}`)
-        }
-        fetchData()
-      } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { details?: string } } })?.response?.data?.details
-        toast.error(msg || 'Import failed')
-      } finally {
-        setImporting(false)
-      }
-    }
-  }
-
   useEffect(() => { fetchData(false) }, [])
 
-  const handleToggleStatus = async (userId: number, userName: string, currentStatus: boolean) => {
-    const action = currentStatus ? 'suspend' : 'activate'
-    if (!window.confirm(`Are you sure you want to ${action} "${userName}"?`)) return
-
-    const previousUser = users.find((u) => u.id === userId)
-    if (!previousUser) return
-
-    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_active: !u.is_active } : u)))
-    setActionLoading(userId)
-    try {
-      await api.put(`/admin/users/${userId}/toggle-status`)
-    } catch {
-      setUsers((prev) => prev.map((u) => (u.id === userId ? previousUser : u)))
-      toast.error('Could not update user status')
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  const handleChangeRole = async (userId: number, userName: string, newRole: string) => {
-    if (!window.confirm(`Change role of "${userName}" to "${newRole}"?`)) return
-
-    const previousUser = users.find((u) => u.id === userId)
-    if (!previousUser) return
-
-    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)))
-    setActionLoading(userId)
-    try {
-      await api.put(`/admin/users/${userId}/role`, { role: newRole })
-    } catch {
-      setUsers((prev) => prev.map((u) => (u.id === userId ? previousUser : u)))
-      toast.error('Could not update user role')
-    } finally {
-      setActionLoading(null)
-    }
-  }
 
   const totalUsers = stats?.totalUsers ?? stats?.users?.reduce((sum, u) => sum + u.count, 0) ?? 0
   const statCards = [
@@ -224,26 +105,15 @@ export default function AdminDashboardPage() {
 
   return (
     <Layout>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground">System overview and user management</p>
+          <p className="text-muted-foreground">System overview and recent users</p>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={handleImportFile}
-            className="hidden"
-          />
-          <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/admin/users')}>
             <FileText className="mr-2 h-4 w-4" />
-            Download Template
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-            <Upload className={`mr-2 h-4 w-4 ${importing ? 'animate-pulse' : ''}`} />
-            {importing ? 'Importing...' : 'Import CSV'}
+            Manage Users
           </Button>
           <Button size="sm" onClick={() => setShowCreate(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
@@ -284,78 +154,41 @@ export default function AdminDashboardPage() {
       </div>
 
       <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            CSV import expects a header row with columns: name, email, password, role, studentId, staffId, department, programme, level, phone.
-          </p>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Recent users</CardTitle>
+            <p className="text-sm text-muted-foreground">Showing the 5 most recently added users. Manage the full list on the user management page.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate('/admin/users')}>
+            <FileText className="mr-2 h-4 w-4" />
+            View all users
+          </Button>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-2">{[1,2,3,4].map(i => <Skeleton key={i} className="h-12 rounded" />)}</div>
+            <div className="space-y-2">{[1,2,3,4,5].map((i) => <Skeleton key={i} className="h-12 rounded" />)}</div>
           ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No users found.</p>
+            <p className="text-sm text-muted-foreground">No user records available.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">Name</th>
-                    <th className="pb-3 font-medium">Email</th>
-                    <th className="pb-3 font-medium">Role</th>
-                    <th className="pb-3 font-medium">Status</th>
-                    <th className="pb-3 font-medium">Joined</th>
-                    <th className="pb-3 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id} className="border-b last:border-0">
-                      <td className="py-3 font-medium">{u.name}</td>
-                      <td className="py-3 text-muted-foreground">{u.email}</td>
-                      <td className="py-3">
-                        <select
-                          value={u.role}
-                          onChange={(e) => handleChangeRole(u.id, u.name, e.target.value)}
-                          disabled={actionLoading === u.id || u.id === user?.id}
-                          className="rounded border px-2 py-1 text-xs"
-                        >
-                          <option value="student">Student</option>
-                          <option value="lecturer">Lecturer</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                      <td className="py-3">
-                        {u.is_active ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Active
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                            <Ban className="mr-1 h-3 w-3" />
-                            Suspended
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="py-3 text-muted-foreground text-xs">
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleStatus(u.id, u.name, u.is_active)}
-                          disabled={actionLoading === u.id || u.id === user?.id}
-                          className={u.is_active ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
-                        >
-                          {u.is_active ? 'Suspend' : 'Activate'}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-3">
+              {[...users]
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .slice(0, 5)
+                .map((u) => (
+                  <div key={u.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">{u.name}</p>
+                      <p className="text-sm text-muted-foreground">{u.email}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{u.role}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{new Date(u.created_at).toLocaleDateString()}</span>
+                      <Badge variant="outline" className={u.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}>
+                        {u.is_active ? 'Active' : 'Suspended'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
         </CardContent>

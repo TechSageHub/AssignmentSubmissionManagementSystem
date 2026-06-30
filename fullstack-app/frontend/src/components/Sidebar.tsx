@@ -28,6 +28,7 @@ import api, { readApiCache } from '@/services/api'
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', roles: ['student', 'lecturer', 'admin'] },
   { icon: Shield, label: 'Admin Panel', path: '/admin', roles: ['admin'] },
+  { icon: UserPlus, label: 'User Management', path: '/admin/users', roles: ['admin'] },
   { icon: ClipboardList, label: 'Assignments', path: '/assignments', roles: ['student', 'lecturer'] },
   { icon: PlusCircle, label: 'Create Assignment', path: '/assignments/new', roles: ['lecturer'] },
   { icon: UserPlus, label: 'Students', path: '/students', roles: ['lecturer'] },
