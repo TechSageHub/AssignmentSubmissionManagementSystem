@@ -100,6 +100,8 @@ export default function AdminDashboardPage() {
   }
 
   // Parse a simple CSV (no quoted-comma support) into row objects keyed by header.
+  const TEMPLATE_HEADERS = ['name', 'email', 'password', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
+
   const parseCsv = (text: string) => {
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0)
     if (lines.length < 2) return []
@@ -110,6 +112,35 @@ export default function AdminDashboardPage() {
       headers.forEach((h, i) => { row[h] = cells[i] ?? '' })
       return row
     })
+  }
+
+  const handleDownloadTemplate = () => {
+    const sampleRow = [
+      'John Doe',
+      'john.doe@fpi.edu.ng',
+      'ChangeMe123',
+      'student',
+      'ND/ICT/2024/0001',
+      '',
+      'Computer Science',
+      'Computer Science',
+      'ND I',
+      '08031234567',
+    ]
+
+    const csvRows = [TEMPLATE_HEADERS, sampleRow]
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\r\n')
+
+    const blob = new Blob([csvRows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'user-import-template.csv'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,6 +237,10 @@ export default function AdminDashboardPage() {
             onChange={handleImportFile}
             className="hidden"
           />
+          <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+            <FileText className="mr-2 h-4 w-4" />
+            Download Template
+          </Button>
           <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
             <Upload className={`mr-2 h-4 w-4 ${importing ? 'animate-pulse' : ''}`} />
             {importing ? 'Importing...' : 'Import CSV'}
