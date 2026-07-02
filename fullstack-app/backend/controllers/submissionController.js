@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const assignmentModel = require('../models/assignment');
 const submissionModel = require('../models/submission');
+const submissionFileModel = require('../models/submissionFile');
 const groupMemberModel = require('../models/groupMember');
 const { sendSubmissionConfirmation } = require('../utils/emailHelper');
 const { notifySubmissionConfirmed } = require('../utils/notificationHelper');
@@ -30,10 +31,6 @@ async function submitAssignment(req, res, next) {
 
     const isLate = new Date() > new Date(assignment.due_date);
 
-    const file = req.files[0];
-    const filePath = path.join('uploads', 'assignments', String(assignmentId), file.filename);
-    const originalName = file.originalname;
-
     const existing = await submissionModel.findByAssignmentAndStudent(assignmentId, req.user.id);
     if (existing) {
       const oldPath = path.resolve(__dirname, '..', existing.file_path);
@@ -44,10 +41,17 @@ async function submitAssignment(req, res, next) {
     const submission = await submissionModel.create({
       assignmentId,
       studentId: req.user.id,
-      filePath,
-      originalName,
+      filePath: path.join('uploads', 'assignments', String(assignmentId), req.files[0].filename),
+      originalName: req.files[0].originalname,
       isLate,
     });
+
+    const storedFiles = await submissionFileModel.createMany(submission.id, req.files.map(file => ({
+      filePath: path.join('uploads', 'assignments', String(assignmentId), file.filename),
+      originalName: file.originalname,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+    })));
 
     // Add group members if provided
     const groupMemberIds = req.body.group_member_ids;
@@ -58,9 +62,11 @@ async function submitAssignment(req, res, next) {
       }
     }
 
-    // Load group members for response
+    // Load group members and files for response
     const members = await groupMemberModel.findBySubmission(submission.id);
+    const files = await submissionFileModel.findBySubmission(submission.id);
     submission.group_members = members;
+    submission.files = files;
 
     try {
       await notifySubmissionConfirmed(req.user.id, assignment.title, submission.id);
@@ -142,7 +148,9 @@ async function getSubmission(req, res, next) {
     }
 
     const members = await groupMemberModel.findBySubmission(submission.id);
+    const files = await submissionFileModel.findBySubmission(submission.id);
     submission.group_members = members;
+    submission.files = files;
 
     res.json(submission);
   } catch (err) {
@@ -171,12 +179,22 @@ async function getSubmissionFile(req, res, next) {
       }
     }
 
-    const filePath = path.resolve(__dirname, '..', submission.file_path);
+    const fileId = parseInt(req.query.fileId, 10);
+    let fileRecord = null;
+    if (!isNaN(fileId)) {
+      fileRecord = await submissionFileModel.findById(fileId);
+      if (!fileRecord || fileRecord.submission_id !== submission.id) {
+        return res.status(404).json({ error: 'NotFoundError', details: 'File not found' });
+      }
+    }
+
+    const selectedFile = fileRecord || { file_path: submission.file_path, original_name: submission.original_name };
+    const filePath = path.resolve(__dirname, '..', selectedFile.file_path);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'NotFoundError', details: 'File not found on server' });
     }
 
-    const ext = path.extname(submission.original_name).toLowerCase();
+    const ext = path.extname(selectedFile.original_name).toLowerCase();
     const mimeMap = {
       '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
       '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
@@ -187,7 +205,7 @@ async function getSubmissionFile(req, res, next) {
     const contentType = mimeMap[ext] || 'application/octet-stream';
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${submission.original_name}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${selectedFile.original_name}"`);
     res.setHeader('Content-Length', fs.statSync(filePath).size);
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

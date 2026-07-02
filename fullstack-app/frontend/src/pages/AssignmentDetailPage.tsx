@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import FilePreview from '@/components/FilePreview'
 import { ArrowLeft, Calendar, FileUp, Upload, Edit3, Users, AlertTriangle, X, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -27,7 +26,7 @@ export default function AssignmentDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [loading, setLoading] = useState(true)
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [showGroupForm, setShowGroupForm] = useState(false)
   const [students, setStudents] = useState<StudentOption[]>([])
@@ -63,10 +62,10 @@ export default function AssignmentDetailPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!file) { toast.error('Please select a file'); return }
+    if (files.length === 0) { toast.error('Please select at least one file'); return }
     setSubmitting(true)
     const formData = new FormData()
-    formData.append('files', file)
+    files.forEach(file => formData.append('files', file))
     if (groupMembers.length > 0) {
       groupMembers.forEach(m => formData.append('group_member_ids', String(m.id)))
     }
@@ -75,7 +74,7 @@ export default function AssignmentDetailPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       toast.success(data.message || 'Submitted successfully!')
-      setFile(null)
+      setFiles([])
       setGroupMembers([])
       setShowGroupForm(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -159,21 +158,33 @@ export default function AssignmentDetailPage() {
                   >
                     <FileUp className="mb-2 h-8 w-8 text-muted-foreground" />
                     <p className="text-sm font-medium">
-                      {file ? file.name : 'Click to upload or drag and drop'}
+                      {files.length > 0 ? `${files.length} file${files.length > 1 ? 's' : ''} selected` : 'Click to upload or drag and drop'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      PDF, DOCX, ZIP up to 10MB
+                      PDF, DOCX, ZIP, images, or code files up to 10MB each
                     </p>
                     <input
                       ref={fileInputRef}
                       type="file"
                       className="hidden"
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      onChange={(e) => setFiles(Array.from(e.target.files || []))}
                     />
                   </div>
 
-                  {file && (
-                    <FilePreview localFile={file} fileName={file.name} />
+                  {files.length > 0 && (
+                    <div className="space-y-2">
+                      {files.map((file, index) => (
+                        <div key={`${file.name}-${index}`} className="rounded-lg border bg-muted/20 p-3 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate font-medium">{file.name}</span>
+                            <button type="button" onClick={() => setFiles(files.filter((_, i) => i !== index))} className="text-muted-foreground hover:text-destructive">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                      ))}
+                    </div>
                   )}
 
                   <div className="border rounded-lg">
@@ -234,7 +245,7 @@ export default function AssignmentDetailPage() {
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={submitting || !file}>
+                  <Button type="submit" className="w-full" disabled={submitting || files.length === 0}>
                     {submitting ? 'Uploading...' : 'Submit'}
                   </Button>
                 </form>

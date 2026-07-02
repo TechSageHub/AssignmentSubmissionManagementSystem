@@ -16,6 +16,7 @@ const migrations = [
   'migration_005_add_audit_log.sql',
   'migration_006_add_owner_requirements.sql',
   'migration_007_add_must_change_password.sql',
+  dbType === 'postgres' ? 'migration_008_add_submission_files.postgres.sql' : 'migration_008_add_submission_files.sql',
 ];
 
 async function runSchema() {

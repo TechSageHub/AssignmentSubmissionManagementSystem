@@ -23,6 +23,7 @@ export default function ViewSubmissionPage() {
     original_name: string
     submitted_at: string
     is_late: boolean
+    files?: Array<{ id: number; original_name: string; file_path: string }>
     grade?: { score: number; feedback: string | null; status?: string; criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number }[] }
   } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -91,8 +92,8 @@ export default function ViewSubmissionPage() {
                   <p className="font-medium mt-0.5">{new Date(submission.submitted_at).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">File</p>
-                  <p className="font-medium mt-0.5 truncate">{submission.original_name}</p>
+                  <p className="text-xs text-muted-foreground font-medium">Files</p>
+                  <p className="font-medium mt-0.5 truncate">{submission.files && submission.files.length > 0 ? `${submission.files.length} uploaded file${submission.files.length > 1 ? 's' : ''}` : submission.original_name}</p>
                 </div>
               </div>
               <div>
@@ -110,10 +111,19 @@ export default function ViewSubmissionPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <FilePreview
-                submissionId={submission.id}
-                fileName={submission.original_name}
-              />
+              <div className="space-y-3">
+                {(submission.files && submission.files.length > 0 ? submission.files : [{ id: submission.id, original_name: submission.original_name, file_path: '' }]).map((file) => (
+                  <div key={file.id} className="rounded-lg border p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-medium truncate">{file.original_name}</p>
+                      <a href={`/api/submissions/${submission.id}/file?fileId=${file.id}`} target="_blank" rel="noreferrer" className="text-sm text-primary underline">
+                        Open
+                      </a>
+                    </div>
+                    <FilePreview submissionId={submission.id} fileName={file.original_name} fileId={file.id} />
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>

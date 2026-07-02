@@ -7,9 +7,10 @@ interface FilePreviewProps {
   submissionId?: number
   fileName?: string
   localFile?: File
+  fileId?: number
 }
 
-export default function FilePreview({ submissionId, fileName, localFile }: FilePreviewProps) {
+export default function FilePreview({ submissionId, fileName, localFile, fileId }: FilePreviewProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(!!submissionId)
   const [error, setError] = useState('')
@@ -30,7 +31,7 @@ export default function FilePreview({ submissionId, fileName, localFile }: FileP
       let url: string | null = null
       const fetchFile = async () => {
         try {
-          const res = await api.get(`/submissions/${submissionId}/file`, {
+          const res = await api.get(`/submissions/${submissionId}/file${fileId ? `?fileId=${fileId}` : ''}`, {
             responseType: 'blob',
           })
           url = URL.createObjectURL(res.data)
@@ -47,7 +48,7 @@ export default function FilePreview({ submissionId, fileName, localFile }: FileP
         if (url) URL.revokeObjectURL(url)
       }
     }
-  }, [submissionId, localFile])
+  }, [submissionId, localFile, fileId])
 
   function detectType(name: string, mime: string) {
     const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp']
