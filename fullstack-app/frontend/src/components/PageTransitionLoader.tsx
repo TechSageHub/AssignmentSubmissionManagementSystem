@@ -4,6 +4,8 @@ interface PageTransitionLoaderProps {
   active: boolean
 }
 
+const segments = Array.from({ length: 8 })
+
 export default function PageTransitionLoader({ active }: PageTransitionLoaderProps) {
   const [visible, setVisible] = useState(false)
 
@@ -11,7 +13,7 @@ export default function PageTransitionLoader({ active }: PageTransitionLoaderPro
     let timeout: number | undefined
     if (active) {
       setVisible(true)
-      timeout = window.setTimeout(() => setVisible(false), 350)
+      timeout = window.setTimeout(() => setVisible(false), 450)
     }
     return () => {
       if (timeout) window.clearTimeout(timeout)
@@ -21,11 +23,25 @@ export default function PageTransitionLoader({ active }: PageTransitionLoaderPro
   if (!visible) return null
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 backdrop-blur-sm">
-      <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-white/90 shadow-xl shadow-slate-900/20">
-        <div className="relative flex h-14 w-14 items-center justify-center">
-          <div className="absolute h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-500" />
-          <div className="absolute h-6 w-6 rounded-full bg-slate-950" />
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 backdrop-blur-sm">
+      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/90 shadow-[0_28px_80px_-32px_rgba(15,23,42,0.8)]">
+        <div className="relative h-16 w-16 animate-spin">
+          {segments.map((_, index) => {
+            const angle = index * 45
+            return (
+              <span
+                key={index}
+                className={
+                  `absolute top-1/2 left-1/2 block h-3 w-1.5 rounded-full bg-slate-400 opacity-40 ${
+                    index === 0 ? 'bg-slate-700 opacity-100' : ''
+                  }`
+                }
+                style={{
+                  transform: `translate(-50%, -50%) rotate(${angle}deg) translate(0, -26px)`,
+                }}
+              />
+            )
+          })}
         </div>
       </div>
     </div>
