@@ -15,6 +15,9 @@ import {
   Clock,
   AlertCircle,
   TrendingUp,
+  CalendarDays,
+  BookOpen,
+  ArrowRight,
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -32,6 +35,7 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({})
   const [assignments, setAssignments] = useState<any[]>([])
+  const [submissions, setSubmissions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -41,6 +45,7 @@ export default function DashboardPage() {
 
       if (cachedAssignments) setAssignments(cachedAssignments)
       if (cachedSubmissions) {
+        setSubmissions(cachedSubmissions)
         if (user?.role === 'lecturer') {
           setStats({
             totalAssignments: cachedAssignments?.length ?? 0,
@@ -72,17 +77,18 @@ export default function DashboardPage() {
 
       try {
         if (user?.role === 'lecturer') {
-          const [assignmentsRes, submissions] = await Promise.all([
+          const [assignmentsRes, submissionsRes] = await Promise.all([
             api.get('/assignments'),
             api.get('/submissions'),
           ])
           setAssignments(assignmentsRes.data)
+          setSubmissions(submissionsRes.data)
           setStats({
             totalAssignments: assignmentsRes.data.length,
-            totalSubmissions: submissions.data.length,
-            pendingGrading: submissions.data.filter((s: { score?: number | null }) => s.score == null).length,
-            averageScore: submissions.data.filter((s: { score?: number | null }) => s.score != null).length > 0
-              ? Math.round(submissions.data.filter((s: { score?: number | null }) => s.score != null).reduce((a: number, s: { score: number }) => a + s.score, 0) / submissions.data.filter((s: { score?: number | null }) => s.score != null).length)
+            totalSubmissions: submissionsRes.data.length,
+            pendingGrading: submissionsRes.data.filter((s: { score?: number | null }) => s.score == null).length,
+            averageScore: submissionsRes.data.filter((s: { score?: number | null }) => s.score != null).length > 0
+              ? Math.round(submissionsRes.data.filter((s: { score?: number | null }) => s.score != null).reduce((a: number, s: { score: number }) => a + s.score, 0) / submissionsRes.data.filter((s: { score?: number | null }) => s.score != null).length)
               : 0,
           })
         } else {
@@ -114,21 +120,56 @@ export default function DashboardPage() {
   }
 
   if (user?.role === 'lecturer') {
+    const now = new Date()
+    const attentionItems = assignments
+      .map((a: any) => {
+        const dueDate = new Date(a.due_date)
+        return {
+          ...a,
+          isOverdue: dueDate < now,
+          dueSoon: dueDate >= now && dueDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        }
+      })
+      .filter((a: any) => a.isOverdue || a.dueSoon)
+      .sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+      .slice(0, 5)
+
+    const recentSubmissions = [...submissions]
+      .sort((a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+      .slice(0, 5)
+
     const lecturerCards = [
-      { title: 'Assignments', value: stats.totalAssignments ?? 0, icon: ClipboardList, color: 'text-blue-600 bg-blue-50' },
-      { title: 'Submissions', value: stats.totalSubmissions ?? 0, icon: FileText, color: 'text-indigo-600 bg-indigo-50' },
+      { title: 'Active Assignments', value: assignments.length, icon: BookOpen, color: 'text-blue-600 bg-blue-50' },
+      { title: 'Submissions', value: submissions.length, icon: FileText, color: 'text-indigo-600 bg-indigo-50' },
       { title: 'Pending Grading', value: stats.pendingGrading ?? 0, icon: Clock, color: 'text-amber-600 bg-amber-50' },
-      { title: 'Avg Score', value: stats.averageScore ?? 0, icon: TrendingUp, color: 'text-green-600 bg-green-50', suffix: '%' },
+      { title: 'Overdue', value: attentionItems.filter((a: any) => a.isOverdue).length, icon: AlertCircle, color: 'text-red-600 bg-red-50' },
+      { title: 'Due This Week', value: attentionItems.filter((a: any) => a.dueSoon).length, icon: CalendarDays, color: 'text-green-600 bg-green-50' },
     ]
 
     return (
       <Layout>
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {user?.name}</p>
+        <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Academic Dashboard</h1>
+            <p className="text-muted-foreground">Track assignments, submissions, and grading activity in one place.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/assignments/new">
+              <Button size="sm" className="gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Create Assignment
+              </Button>
+            </Link>
+            <Link to="/assignments">
+              <Button variant="outline" size="sm" className="gap-2">
+                <BookOpen className="h-4 w-4" />
+                Manage Assignments
+              </Button>
+            </Link>
+          </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {lecturerCards.map((card) => (
             <Card key={card.title} className="transition-shadow hover:shadow-md">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -141,57 +182,102 @@ export default function DashboardPage() {
                 {loading ? (
                   <Skeleton className="h-8 w-16" />
                 ) : (
-                  <div className="text-2xl font-bold">
-                    {card.value}{card.suffix || ''}
-                  </div>
+                  <div className="text-2xl font-bold">{card.value}</div>
                 )}
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Link to="/assignments/new">
-                <Button variant="outline" className="w-full justify-start gap-2">
-                  <ClipboardList className="h-4 w-4" />
-                  Create New Assignment
-                </Button>
-              </Link>
-              <Link to="/assignments">
-                <Button variant="outline" className="w-full justify-start gap-2">
-                  <FileText className="h-4 w-4" />
-                  View All Assignments
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+        <div className="mt-8 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Submission Queue</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-10 rounded" />)}</div>
+                ) : recentSubmissions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No submissions received yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {recentSubmissions.map((submission: any) => {
+                      const isPending = submission.score == null
+                      return (
+                        <div key={submission.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-medium">{submission.student_name}</p>
+                            <p className="text-sm text-muted-foreground">{submission.assignment_title}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-1 text-xs ${isPending ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
+                              {isPending ? 'Pending Grade' : 'Graded'}
+                            </span>
+                            <Link to={`/submissions/${submission.id}`} className="text-sm font-medium text-primary inline-flex items-center gap-1">
+                              Review <ArrowRight className="h-3.5 w-3.5" />
+                            </Link>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Assignments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-8 rounded" />)}</div>
-              ) : assignments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No assignments yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {assignments.slice(0, 5).map((a: any) => (
-                    <Link key={a.id} to={`/assignments/${a.id}`} className="flex items-center justify-between rounded-lg p-2 text-sm hover:bg-muted/50 transition-colors">
-                      <span className="font-medium truncate">{a.title}</span>
-                      <span className="text-xs text-muted-foreground shrink-0 ml-2">{new Date(a.due_date).toLocaleDateString()}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Priority Deadlines</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-8 rounded" />)}</div>
+                ) : attentionItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No deadlines to watch this week.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {attentionItems.map((assignment: any) => (
+                      <Link key={assignment.id} to={`/assignments/${assignment.id}/submissions`} className="flex items-center justify-between rounded-lg p-2 text-sm hover:bg-muted/50 transition-colors">
+                        <span className="min-w-0 flex-1 truncate font-medium">{assignment.title}</span>
+                        <span className={`ml-2 shrink-0 rounded-full px-2 py-1 text-xs ${assignment.isOverdue ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                          {assignment.isOverdue ? 'Overdue' : 'Due Soon'}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Link to="/assignments/new">
+                  <Button variant="outline" className="w-full justify-start gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Create New Assignment
+                  </Button>
+                </Link>
+                <Link to="/assignments">
+                  <Button variant="outline" className="w-full justify-start gap-2">
+                    <FileText className="h-4 w-4" />
+                    Review All Assignments
+                  </Button>
+                </Link>
+                <Link to="/submissions">
+                  <Button variant="outline" className="w-full justify-start gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Grade Submissions
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </Layout>
     )

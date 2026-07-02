@@ -12,10 +12,12 @@ async function create({ assignmentId, studentId, filePath, originalName, isLate 
 
 async function findAll(lecturerId) {
   const result = await query(
-    `SELECT s.*, a.title AS assignment_title, u.name AS student_name
+    `SELECT s.*, a.title AS assignment_title, u.name AS student_name,
+            g.score, g.feedback, g.graded_at AS grade_graded_at
      FROM Submissions s
      JOIN Assignments a ON a.id = s.assignment_id
      JOIN Users u ON u.id = s.student_id
+     LEFT JOIN Grades g ON g.submission_id = s.id
      WHERE a.lecturer_id = @lecturerId
      ORDER BY s.submitted_at DESC`,
     { lecturerId }
