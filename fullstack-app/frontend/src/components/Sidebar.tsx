@@ -6,7 +6,6 @@ import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard,
   ClipboardList,
-  PlusCircle,
   FileText,
   UserPlus,
   LogOut,
@@ -30,7 +29,6 @@ const navItems = [
   { icon: Shield, label: 'Admin Panel', path: '/admin', roles: ['admin'] },
   { icon: UserPlus, label: 'User Management', path: '/admin/users', roles: ['admin'] },
   { icon: ClipboardList, label: 'Assignments', path: '/assignments', roles: ['student', 'lecturer'] },
-  { icon: PlusCircle, label: 'Create Assignment', path: '/assignments/new', roles: ['lecturer'] },
   { icon: UserPlus, label: 'Students', path: '/students', roles: ['lecturer'] },
   { icon: FileText, label: 'My Submissions', path: '/my-submissions', roles: ['student'] },
   { icon: Settings, label: 'Profile', path: '/profile', roles: ['student', 'lecturer'] },
