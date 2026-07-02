@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, Download, GraduationCap, BarChart3, List, Eye } from 'lucide-react'
+import { ArrowLeft, Download, GraduationCap, BarChart3, List, Eye, Filter, CheckCircle2, Clock3 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface SubmissionRow {
@@ -36,6 +36,7 @@ export default function AssignmentSubmissionsPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'submissions' | 'analytics'>('submissions')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'graded' | 'pending'>('all')
 
   useEffect(() => {
     Promise.all([
@@ -57,6 +58,7 @@ export default function AssignmentSubmissionsPage() {
   }
 
   const ungraded = rows.filter((r) => r.score == null)
+  const filteredRows = rows.filter((r) => statusFilter === 'all' ? true : statusFilter === 'graded' ? r.score != null : r.score == null)
 
   return (
     <Layout>
@@ -106,6 +108,19 @@ export default function AssignmentSubmissionsPage() {
         </div>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 rounded-lg border p-1">
+          <Filter className="ml-2 h-4 w-4 text-muted-foreground" />
+          <Button variant={statusFilter === 'all' ? 'default' : 'ghost'} size="sm" onClick={() => setStatusFilter('all')}>All</Button>
+          <Button variant={statusFilter === 'pending' ? 'default' : 'ghost'} size="sm" onClick={() => setStatusFilter('pending')} className="gap-1">
+            <Clock3 className="h-3.5 w-3.5" /> Pending
+          </Button>
+          <Button variant={statusFilter === 'graded' ? 'default' : 'ghost'} size="sm" onClick={() => setStatusFilter('graded')} className="gap-1">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Graded
+          </Button>
+        </div>
+      </div>
+
       {tab === 'analytics' && analytics ? (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -148,7 +163,7 @@ export default function AssignmentSubmissionsPage() {
             </CardContent>
           </Card>
         </div>
-      ) : rows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <GraduationCap className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
@@ -157,7 +172,7 @@ export default function AssignmentSubmissionsPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {rows.map((r) => (
+          {filteredRows.map((r) => (
             <Card key={r.id} className="transition-all duration-150 hover:shadow-md">
               <CardContent className="flex items-center justify-between p-4">
                 <div className="min-w-0 flex-1">

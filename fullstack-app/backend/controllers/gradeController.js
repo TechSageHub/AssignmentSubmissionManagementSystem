@@ -59,6 +59,34 @@ async function gradeSubmission(req, res, next) {
   }
 }
 
+async function bulkGradeSubmissions(req, res, next) {
+  try {
+    const { submissionIds, score, feedback } = req.body;
+    if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
+      return res.status(400).json({ error: 'ValidationError', details: 'At least one submission is required' });
+    }
+
+    const numericScore = Number(score);
+    if (isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Score must be a number between 0 and 100' });
+    }
+
+    const results = [];
+    for (const submissionId of submissionIds) {
+      const parsedId = parseInt(submissionId, 10);
+      if (isNaN(parsedId)) continue;
+      const submission = await submissionModel.findById(parsedId);
+      if (!submission) continue;
+      const grade = await gradeModel.upsert({ submissionId: parsedId, score: numericScore, feedback: feedback || null });
+      results.push({ submissionId: parsedId, gradeId: grade.id });
+    }
+
+    res.json({ message: 'Bulk grading completed', updated: results.length, results });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getGrade(req, res, next) {
   try {
     const submissionId = parseInt(req.params.submissionId, 10);
@@ -87,4 +115,4 @@ async function getGrade(req, res, next) {
   }
 }
 
-module.exports = { gradeSubmission, getGrade };
+module.exports = { gradeSubmission, bulkGradeSubmissions, getGrade };
