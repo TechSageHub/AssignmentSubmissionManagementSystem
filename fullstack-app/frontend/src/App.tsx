@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { AuthProvider } from '@/context/AuthContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -34,20 +34,26 @@ function RootRedirect() {
 
 function AppContent() {
   const location = useLocation()
+  const navigationType = useNavigationType()
   const [transitioning, setTransitioning] = useState(false)
   const previousPath = useRef(location.pathname)
 
   useEffect(() => {
-    if (location.pathname !== previousPath.current) {
+    if (location.pathname !== previousPath.current && navigationType === 'PUSH') {
       setTransitioning(true)
       previousPath.current = location.pathname
-      const timeout = window.setTimeout(() => {
-        setTransitioning(false)
-      }, 400)
-      return () => window.clearTimeout(timeout)
+    } else {
+      previousPath.current = location.pathname
     }
-    return undefined
-  }, [location.pathname])
+  }, [location.pathname, navigationType])
+
+  useEffect(() => {
+    if (!transitioning) return undefined
+    const timeout = window.setTimeout(() => {
+      setTransitioning(false)
+    }, 300)
+    return () => window.clearTimeout(timeout)
+  }, [transitioning])
 
   return (
     <>
