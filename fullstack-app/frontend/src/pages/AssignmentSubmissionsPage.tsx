@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, Download, GraduationCap, BarChart3, List, Eye, Filter, CheckCircle2, Clock3 } from 'lucide-react'
+import { ArrowLeft, Download, GraduationCap, BarChart3, List, Eye, Filter, CheckCircle2, Clock3, Square, SquareCheckBig } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { toast } from 'sonner'
 
 interface SubmissionRow {
   id: number
@@ -37,15 +38,28 @@ export default function AssignmentSubmissionsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'submissions' | 'analytics'>('submissions')
   const [statusFilter, setStatusFilter] = useState<'all' | 'graded' | 'pending'>('all')
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [bulkScore, setBulkScore] = useState('')
+  const [bulkFeedback, setBulkFeedback] = useState('')
+  const [bulkSaving, setBulkSaving] = useState(false)
 
-  useEffect(() => {
-    Promise.all([
-      api.get(`/assignments/${id}/submissions`),
-      api.get(`/assignments/${id}/analytics`).catch(() => ({ data: null })),
-    ]).then(([subRes, anaRes]) => {
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [subRes, anaRes] = await Promise.all([
+        api.get(`/assignments/${id}/submissions`),
+        api.get(`/assignments/${id}/analytics`).catch(() => ({ data: null })),
+      ])
       setRows(subRes.data)
       setAnalytics(anaRes.data)
-    }).catch(() => {}).finally(() => setLoading(false))
+      setSelectedIds([])
+    } catch { /* ignore */ } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
   }, [id])
 
   if (loading) {
@@ -59,6 +73,48 @@ export default function AssignmentSubmissionsPage() {
 
   const ungraded = rows.filter((r) => r.score == null)
   const filteredRows = rows.filter((r) => statusFilter === 'all' ? true : statusFilter === 'graded' ? r.score != null : r.score == null)
+
+  const toggleSelection = (submissionId: number) => {
+    setSelectedIds((prev) => prev.includes(submissionId) ? prev.filter((id) => id !== submissionId) : [...prev, submissionId])
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredRows.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredRows.map((row) => row.id))
+    }
+  }
+
+  const handleBulkGrade = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (selectedIds.length === 0) {
+      toast.error('Select at least one submission first')
+      return
+    }
+    const scoreNum = Number(bulkScore)
+    if (!bulkScore || isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+      toast.error('Enter a valid score between 0 and 100')
+      return
+    }
+
+    setBulkSaving(true)
+    try {
+      await api.post('/submissions/bulk-grade', {
+        submissionIds: selectedIds,
+        score: scoreNum,
+        feedback: bulkFeedback,
+      })
+      toast.success(`Graded ${selectedIds.length} submission${selectedIds.length > 1 ? 's' : ''}`)
+      setBulkScore('')
+      setBulkFeedback('')
+      await fetchData()
+    } catch {
+      toast.error('Bulk grading failed')
+    } finally {
+      setBulkSaving(false)
+    }
+  }
 
   return (
     <Layout>
@@ -119,7 +175,48 @@ export default function AssignmentSubmissionsPage() {
             <CheckCircle2 className="h-3.5 w-3.5" /> Graded
           </Button>
         </div>
+        <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+          {selectedIds.length === filteredRows.length && filteredRows.length > 0 ? 'Clear Selection' : 'Select Visible'}
+        </Button>
       </div>
+
+      {selectedIds.length > 0 && (
+        <Card className="mb-4 border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <form onSubmit={handleBulkGrade} className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <div className="flex-1">
+                <p className="text-sm font-medium">Bulk grading {selectedIds.length} selected submission{selectedIds.length > 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground">Apply one score and feedback to all selected submissions.</p>
+              </div>
+              <div className="w-full lg:w-28">
+                <label className="mb-1 block text-xs text-muted-foreground">Score</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={bulkScore}
+                  onChange={(e) => setBulkScore(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="85"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-xs text-muted-foreground">Feedback</label>
+                <input
+                  type="text"
+                  value={bulkFeedback}
+                  onChange={(e) => setBulkFeedback(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Common feedback"
+                />
+              </div>
+              <Button type="submit" size="sm" disabled={bulkSaving}>
+                {bulkSaving ? 'Saving...' : 'Apply to Selected'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {tab === 'analytics' && analytics ? (
         <div className="space-y-6">
@@ -175,6 +272,16 @@ export default function AssignmentSubmissionsPage() {
           {filteredRows.map((r) => (
             <Card key={r.id} className="transition-all duration-150 hover:shadow-md">
               <CardContent className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-2 pr-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSelection(r.id)}
+                    className="rounded border p-1 text-primary"
+                    aria-label={`Select ${r.student_name}`}
+                  >
+                    {selectedIds.includes(r.id) ? <SquareCheckBig className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                  </button>
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="font-medium">{r.student_name}</h3>
