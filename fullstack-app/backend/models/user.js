@@ -1,5 +1,28 @@
 const { query } = require('../config/db');
 
+function buildUserFindByIdQuery(includeMustChangePassword = true) {
+  const columns = [
+    'id', 'name', 'email', 'username', 'role', 'is_verified', 'is_active', 'is_verified',
+    'student_id', 'staff_id', 'department', 'programme', 'level', 'phone'
+  ];
+
+  if (includeMustChangePassword) {
+    columns.push('must_change_password');
+  }
+
+  columns.push('created_at');
+  return `SELECT ${columns.join(', ')} FROM Users WHERE id = @id`;
+}
+
+function isMissingColumnError(err, columnName) {
+  const message = (err && (err.message || err.details || ''))?.toString() || '';
+  if (!message) return false;
+
+  const escapedColumnName = columnName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b${escapedColumnName}\\b`, 'i').test(message)
+    && /(invalid column name|column .* does not exist|does not exist|undefined column)/i.test(message);
+}
+
 async function findByEmail(email) {
   const result = await query('SELECT * FROM Users WHERE email = @email', { email });
   return result.recordset[0] || null;
@@ -19,13 +42,23 @@ async function findByEmailOrUsername(login) {
 }
 
 async function findById(id) {
-  const result = await query(
-    `SELECT id, name, email, username, role, is_verified, is_active, is_verified,
-            student_id, staff_id, department, programme, level, phone, must_change_password, created_at
-     FROM Users WHERE id = @id`,
-    { id }
-  );
-  return result.recordset[0] || null;
+  const attempts = [true, false];
+  let lastError;
+
+  for (const includeMustChangePassword of attempts) {
+    try {
+      const result = await query(buildUserFindByIdQuery(includeMustChangePassword), { id });
+      return result.recordset[0] || null;
+    } catch (err) {
+      if (includeMustChangePassword && isMissingColumnError(err, 'must_change_password')) {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError;
 }
 
 const crypto = require('crypto');
@@ -45,13 +78,27 @@ async function createUser({ name, email, passwordHash, role, username, studentId
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const mustChange = Boolean(mustChangePassword);
-  const result = await query(
-    `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, must_change_password, verification_token, verification_token_expires)
-     OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.username, INSERTED.created_at, INSERTED.verification_token
-     VALUES (@name, @email, @passwordHash, @role, @username, @studentId, @staffId, @department, @programme, @level, @phone, @mustChange, @token, @expires)`,
-    { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChange, token, expires }
-  );
-  return result.recordset[0];
+
+  try {
+    const result = await query(
+      `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, must_change_password, verification_token, verification_token_expires)
+       OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.username, INSERTED.created_at, INSERTED.verification_token
+       VALUES (@name, @email, @passwordHash, @role, @username, @studentId, @staffId, @department, @programme, @level, @phone, @mustChange, @token, @expires)`,
+      { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChange, token, expires }
+    );
+    return result.recordset[0];
+  } catch (err) {
+    if (isMissingColumnError(err, 'must_change_password')) {
+      const fallbackResult = await query(
+        `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, verification_token, verification_token_expires)
+         OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.username, INSERTED.created_at, INSERTED.verification_token
+         VALUES (@name, @email, @passwordHash, @role, @username, @studentId, @staffId, @department, @programme, @level, @phone, @token, @expires)`,
+        { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, token, expires }
+      );
+      return fallbackResult.recordset[0];
+    }
+    throw err;
+  }
 }
 
 async function findByVerificationToken(token) {
@@ -127,10 +174,22 @@ async function findByIdWithEmail(id) {
 async function updatePassword(id, newPassword) {
   const bcrypt = require('bcryptjs');
   const hash = await bcrypt.hash(newPassword, 10);
-  await query(
-    'UPDATE Users SET password_hash = @hash, must_change_password = 0, verification_token = NULL, verification_token_expires = NULL WHERE id = @id',
-    { hash, id }
-  );
+
+  try {
+    await query(
+      'UPDATE Users SET password_hash = @hash, must_change_password = 0, verification_token = NULL, verification_token_expires = NULL WHERE id = @id',
+      { hash, id }
+    );
+  } catch (err) {
+    if (isMissingColumnError(err, 'must_change_password')) {
+      await query(
+        'UPDATE Users SET password_hash = @hash, verification_token = NULL, verification_token_expires = NULL WHERE id = @id',
+        { hash, id }
+      );
+      return;
+    }
+    throw err;
+  }
 }
 
 async function updateProfile(id, { department, programme, level, phone }) {
@@ -144,4 +203,4 @@ async function updateProfile(id, { department, programme, level, phone }) {
   return result.recordset[0] || null;
 }
 
-module.exports = { findByEmail, findByUsername, findByEmailOrUsername, findById, createUser, findByVerificationToken, verifyUser, setVerificationToken, findAll, updateRole, setActiveStatus, getStats, findAllStudents, findByIdWithEmail, updatePassword, updateProfile };
+module.exports = { buildUserFindByIdQuery, isMissingColumnError, findByEmail, findByUsername, findByEmailOrUsername, findById, createUser, findByVerificationToken, verifyUser, setVerificationToken, findAll, updateRole, setActiveStatus, getStats, findAllStudents, findByIdWithEmail, updatePassword, updateProfile };
