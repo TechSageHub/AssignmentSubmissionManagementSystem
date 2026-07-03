@@ -28,7 +28,10 @@ export default function EditAssignmentPage() {
       .then(({ data }: { data: Assignment }) => {
         setTitle(data.title)
         setDescription(data.description || '')
-        setDueDate(new Date(data.due_date).toISOString().slice(0, 16))
+        // Format the date directly without timezone conversion
+        // The datetime-local input expects "YYYY-MM-DDTHH:mm" format
+        const dateStr = data.due_date.replace(' ', 'T').slice(0, 16)
+        setDueDate(dateStr)
         setCourseCode((data as any).course_code || '')
         setCourseTitle((data as any).course_title || '')
       })

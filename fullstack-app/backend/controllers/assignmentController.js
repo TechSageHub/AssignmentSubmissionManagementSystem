@@ -17,7 +17,10 @@ async function createAssignment(req, res, next) {
     if (!due_date) {
       return res.status(400).json({ error: 'ValidationError', details: 'Due date is required' });
     }
-    if (new Date(due_date) <= new Date()) {
+
+    // Convert datetime-local format to Date, handling timezone correctly
+    const dueDateTime = new Date(due_date + ':00'); // Add seconds for proper parsing
+    if (dueDateTime <= new Date()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Due date must be in the future' });
     }
 
@@ -25,7 +28,7 @@ async function createAssignment(req, res, next) {
       lecturerId: req.user.id,
       title: title.trim(),
       description: description || null,
-      dueDate: new Date(due_date),
+      dueDate: dueDateTime,
       courseCode: course_code || null,
       courseTitle: course_title || null,
     });
@@ -87,10 +90,18 @@ async function updateAssignment(req, res, next) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
     }
 
+    // Handle due_date: convert string directly without timezone issues
+    let dueDate = assignment.due_date;
+    if (due_date) {
+      // The datetime-local input sends "YYYY-MM-DDTHH:mm" format
+      // Convert to proper Date format for database storage
+      dueDate = new Date(due_date + ':00'); // Add seconds for proper parsing
+    }
+
     const updated = await assignmentModel.update(req.params.id, {
       title: title.trim(),
       description: description || null,
-      dueDate: due_date ? new Date(due_date) : assignment.due_date,
+      dueDate,
       courseCode: course_code !== undefined ? course_code : assignment.course_code,
       courseTitle: course_title !== undefined ? course_title : assignment.course_title,
     });
