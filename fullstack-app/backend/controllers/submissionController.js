@@ -288,9 +288,14 @@ async function getSubmissionFile(req, res, next) {
     const ext = path.extname(selectedFile.original_name).toLowerCase();
     const mimeMap = {
       '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-      '.gif': 'image/gif', '.webp': 'image/webp',
+      '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
       '.pdf': 'application/pdf',
-      '.txt': 'text/plain', '.csv': 'text/csv',
+      '.txt': 'text/plain', '.csv': 'text/csv', '.json': 'application/json',
+      '.html': 'text/html', '.htm': 'text/html', '.css': 'text/css',
+      '.js': 'text/plain', '.ts': 'text/plain', '.tsx': 'text/plain', '.jsx': 'text/plain',
+      '.py': 'text/plain', '.java': 'text/plain', '.c': 'text/plain', '.cpp': 'text/plain',
+      '.h': 'text/plain', '.cs': 'text/plain', '.sql': 'text/plain', '.md': 'text/markdown',
+      '.xml': 'text/xml', '.log': 'text/plain', '.env': 'text/plain',
     };
     const contentType = mimeMap[ext] || 'application/octet-stream';
 
