@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const userModel = require('../models/user');
 const { sendEmail } = require('../config/email');
+const { escapeHtml } = require('../utils/html');
 const auditLog = require('../utils/auditLogger');
 
 async function login(req, res, next) {
@@ -91,10 +92,11 @@ async function resendVerification(req, res, next) {
       await sendEmail({
         to: email,
         subject: 'Verify your email',
-        html: `<p>Hi ${user.name},</p><p>Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>`,
+        html: `<p>Hi ${escapeHtml(user.name)},</p><p>Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>`,
       });
     } catch (emailErr) {
       console.error('Failed to send verification email:', emailErr.message);
+      return res.status(500).json({ error: 'EmailSendError', details: 'Failed to send the verification email. Please try again.' });
     }
 
     res.json({ message: 'Verification email sent. Please check your inbox.' });
@@ -123,7 +125,7 @@ async function forgotPassword(req, res, next) {
         subject: 'Reset your password',
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #6366f1;">Password Reset</h2>
-          <p>Hi ${user.name},</p>
+          <p>Hi ${escapeHtml(user.name)},</p>
           <p>Click the button below to reset your password. This link expires in 24 hours.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${resetUrl}" style="background: #6366f1; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">Reset Password</a>
@@ -133,6 +135,7 @@ async function forgotPassword(req, res, next) {
       });
     } catch (emailErr) {
       console.error('Failed to send reset email:', emailErr.message);
+      return res.status(500).json({ error: 'EmailSendError', details: 'Failed to send the reset email. Please try again.' });
     }
 
     res.json({ message: 'If the email exists, a reset link has been sent.' });

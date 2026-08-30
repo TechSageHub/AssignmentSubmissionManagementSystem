@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const config = require('../config/env');
 const userModel = require('../models/user');
 const { sendEmail } = require('../config/email');
+const { escapeHtml } = require('../utils/html');
 const auditLog = require('../utils/auditLogger');
 
 const ALLOWED_ROLES = ['student', 'lecturer', 'admin'];
@@ -64,9 +65,9 @@ This link expires in 24 hours.
 
 After verification, you will be asked to set your own password on first login.
 `,
-      html: `<p>Hi ${name},</p>
+      html: `<p>Hi ${escapeHtml(name)},</p>
         <p>An account has been created for you on the FPI Assignment Submission System.</p>
-        <p><strong>Temporary password:</strong> ${password}</p>
+        <p><strong>Temporary password:</strong> ${escapeHtml(password)}</p>
         <p>Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>
         <p>After verification, you will be asked to set your own password on first login.</p>`,
     });

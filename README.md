@@ -113,6 +113,21 @@ Set `DB_TYPE=postgres` and provide:
 | `DB_PASSWORD` | Database password |
 | `DB_SSL` | Set to `true` for SSL connections |
 
+## Accounts & Admin Bootstrap
+
+- **`database/seed.sql` is development-only.** It creates a sample lecturer and
+  student with the **known password `password123`**. Never run it against a
+  production database.
+- The schema seeds an admin account with a **placeholder password hash that
+  cannot authenticate** — it exists only to reserve the admin row.
+- Bootstrap a real admin (or reset an existing one) with the idempotent script:
+
+```bash
+cd fullstack-app/backend
+$env:ADMIN_EMAIL="admin@example.com"; $env:ADMIN_PASSWORD="a-strong-password"; npm run create-admin
+# or: ADMIN_EMAIL=... ADMIN_PASSWORD=... npm run create-admin   (bash)
+```
+
 ## Deployment (Render)
 
 This project includes a `render.yaml` for one-click deployment on Render.
