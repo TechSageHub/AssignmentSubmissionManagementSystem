@@ -90,6 +90,13 @@ function convertPgSql(sql, params) {
     }
   );
   s = s.replace(
+    /(UPDATE\s+[\s\S]*?)\s*OUTPUT\s+(INSERTED\.\*|(?:INSERTED\.\w+(?:\s*,\s*INSERTED\.\w+)*))\s+WHERE\s+([\s\S]*)/gi,
+    (_, updatePart, outputCols, wherePart) => {
+      const returning = outputCols.replace(/\bINSERTED\./gi, '');
+      return `${updatePart} WHERE ${wherePart} RETURNING ${returning}`;
+    }
+  );
+  s = s.replace(
     /(DELETE\s+FROM\s+\S+)\s+OUTPUT\s+(DELETED\.\w+)\s+(WHERE\s+.*)/gi,
     (_, deletePart, outputCols, wherePart) => {
       const returning = outputCols.replace(/\bDELETED\./gi, '');
@@ -269,4 +276,4 @@ async function withPgTransaction(fn) {
   }
 }
 
-module.exports = { getPool, query, withTransaction, isConnectionError, isDuplicateKeyError, sql: dbType === 'postgres' ? null : mssql };
+module.exports = { getPool, query, withTransaction, isConnectionError, isDuplicateKeyError, convertPgSql, sql: dbType === 'postgres' ? null : mssql };
