@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import { Button } from '@/components/ui/button'
 import { GraduationCap, ClipboardList, CheckCircle2, TrendingUp, ArrowRight, Users, Clock } from 'lucide-react'
 
@@ -10,6 +11,7 @@ const features = [
 ]
 
 export default function HomePage() {
+  usePageTitle('Home')
   return (
     <div className="flex min-h-screen flex-col">
       {/* Navigation */}

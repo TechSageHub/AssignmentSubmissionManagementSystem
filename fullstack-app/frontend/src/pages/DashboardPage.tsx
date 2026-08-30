@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import api, { readApiCache } from '@/services/api'
 import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
-import { Navigate } from 'react-router-dom'
+import { Navigate, Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Link } from 'react-router-dom'
+import { ErrorState } from '@/components/PageState'
 import {
   ClipboardList,
   FileText,
   CheckCircle2,
   Clock,
   AlertCircle,
-  TrendingUp,
   CalendarDays,
   BookOpen,
   ArrowRight,
@@ -32,13 +32,17 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  usePageTitle('Dashboard')
   const { user } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({})
   const [assignments, setAssignments] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    setError(false)
     const fetchStats = async () => {
       const cachedAssignments = readApiCache<Assignment[]>('/assignments')
       const cachedSubmissions = readApiCache<any[]>(user?.role === 'lecturer' ? '/submissions' : '/submissions/mine')
@@ -108,12 +112,14 @@ export default function DashboardPage() {
             ).length,
           })
         }
-      } catch { /* ignore */ } finally {
+      } catch {
+        setError(true)
+      } finally {
         setLoading(false)
       }
     }
     fetchStats()
-  }, [user])
+  }, [user, reloadKey])
 
   if (user?.role === 'admin') {
     return <Navigate to="/admin" replace />
@@ -168,6 +174,12 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-6">
+            <ErrorState message="Could not refresh your dashboard data." onRetry={() => setReloadKey((k) => k + 1)} />
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {lecturerCards.map((card) => (
@@ -269,12 +281,6 @@ export default function DashboardPage() {
                     Review All Assignments
                   </Button>
                 </Link>
-                <Link to="/submissions">
-                  <Button variant="outline" className="w-full justify-start gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Grade Submissions
-                  </Button>
-                </Link>
               </CardContent>
             </Card>
           </div>
@@ -296,6 +302,12 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">Welcome back, {user?.name}</p>
       </div>
+
+      {error && (
+        <div className="mb-6">
+          <ErrorState message="Could not refresh your dashboard data." onRetry={() => setReloadKey((k) => k + 1)} />
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {studentCards.map((card) => (

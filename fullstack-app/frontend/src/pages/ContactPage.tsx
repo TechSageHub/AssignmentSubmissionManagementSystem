@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, MapPin, Mail, Phone, Clock } from 'lucide-react'
 
@@ -10,6 +11,7 @@ const contactInfo = [
 ]
 
 export default function ContactPage() {
+  usePageTitle('Contact')
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md">

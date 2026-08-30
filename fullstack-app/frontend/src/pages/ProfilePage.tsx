@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import api from '@/services/api'
 import Layout from '@/components/Layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -9,18 +10,21 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import { ErrorState } from '@/components/PageState'
 import { User, Mail, Hash, BadgeCheck, Save } from 'lucide-react'
 import { toast } from 'sonner'
 
 const levels = ['ND I', 'ND II', 'HND I', 'HND II']
 
 export default function ProfilePage() {
+  usePageTitle('Profile')
   const { user, token } = useAuth()
   const [department, setDepartment] = useState('')
   const [programme, setProgramme] = useState('')
   const [level, setLevel] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -30,7 +34,7 @@ export default function ProfilePage() {
         setProgramme((data as any).programme || '')
         setLevel((data as any).level || '')
         setPhone((data as any).phone || '')
-      }).catch(() => {}).finally(() => setLoading(false))
+      }).catch(() => setLoadError(true)).finally(() => setLoading(false))
     }
   }, [user, token])
 
@@ -57,6 +61,12 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
         <p className="text-muted-foreground">Manage your account information</p>
       </div>
+
+      {loadError && (
+        <div className="mb-6">
+          <ErrorState message="Could not load your profile details." />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">

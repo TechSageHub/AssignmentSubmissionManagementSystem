@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api, { readApiCache } from '@/services/api'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import Layout from '@/components/Layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState, EmptyState } from '@/components/PageState'
 import { Eye, FileText, Calendar } from 'lucide-react'
 
 interface MySubmission {
@@ -20,10 +22,14 @@ interface MySubmission {
 }
 
 export default function MySubmissionsPage() {
+  usePageTitle('My Submissions')
   const [submissions, setSubmissions] = useState<MySubmission[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    setError(false)
     const cachedSubmissions = readApiCache<MySubmission[]>('/submissions/mine')
     if (cachedSubmissions) {
       setSubmissions(cachedSubmissions)
@@ -33,12 +39,12 @@ export default function MySubmissionsPage() {
     api.get('/submissions/mine')
       .then(({ data }) => setSubmissions(data))
       .catch(() => {
-        if (!cachedSubmissions) setSubmissions([])
+        if (!cachedSubmissions) setError(true)
       })
       .finally(() => {
         if (!cachedSubmissions) setLoading(false)
       })
-  }, [])
+  }, [reloadKey])
 
   if (loading) {
     return (
@@ -56,16 +62,18 @@ export default function MySubmissionsPage() {
         <p className="text-muted-foreground">Track all your submitted work</p>
       </div>
 
-      {submissions.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No submissions yet.</p>
+      {error ? (
+        <ErrorState message="Could not load your submissions." onRetry={() => setReloadKey((k) => k + 1)} />
+      ) : submissions.length === 0 ? (
+        <EmptyState
+          title="No submissions yet"
+          description="Once you submit work for an assignment it will appear here with its grade."
+          action={
             <Link to="/assignments">
-              <Button variant="outline" className="mt-4">Browse Assignments</Button>
+              <Button variant="outline"><FileText className="mr-2 h-4 w-4" />Browse Assignments</Button>
             </Link>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {submissions.map((s) => (

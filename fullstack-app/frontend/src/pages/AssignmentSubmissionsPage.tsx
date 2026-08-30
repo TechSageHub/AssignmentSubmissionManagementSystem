@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '@/services/api'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import Layout from '@/components/Layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/PageState'
 import { ArrowLeft, Download, GraduationCap, BarChart3, List, Eye, Filter, CheckCircle2, Clock3, Square, SquareCheckBig } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
@@ -32,10 +34,13 @@ interface AnalyticsData {
 }
 
 export default function AssignmentSubmissionsPage() {
+  usePageTitle('Assignment Submissions')
   const { id } = useParams()
   const [rows, setRows] = useState<SubmissionRow[]>([])
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [tab, setTab] = useState<'submissions' | 'analytics'>('submissions')
   const [statusFilter, setStatusFilter] = useState<'all' | 'graded' | 'pending'>('all')
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -68,6 +73,7 @@ export default function AssignmentSubmissionsPage() {
 
   const fetchData = async () => {
     setLoading(true)
+    setError(false)
     try {
       const [subRes, anaRes] = await Promise.all([
         api.get(`/assignments/${id}/submissions`),
@@ -76,14 +82,16 @@ export default function AssignmentSubmissionsPage() {
       setRows(subRes.data)
       setAnalytics(anaRes.data)
       setSelectedIds([])
-    } catch { /* ignore */ } finally {
+    } catch {
+      setError(true)
+    } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchData()
-  }, [id])
+  }, [id, reloadKey])
 
   if (loading) {
     return (
@@ -239,7 +247,13 @@ export default function AssignmentSubmissionsPage() {
         </Card>
       )}
 
-      {tab === 'analytics' && analytics ? (
+      {error ? (
+        <Card>
+          <CardContent className="py-12">
+            <ErrorState message="Could not load submissions." onRetry={() => setReloadKey((k) => k + 1)} />
+          </CardContent>
+        </Card>
+      ) : tab === 'analytics' && analytics ? (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[

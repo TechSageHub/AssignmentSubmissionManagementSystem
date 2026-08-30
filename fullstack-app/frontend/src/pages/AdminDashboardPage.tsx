@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import api, { readApiCache } from '@/services/api'
 import Layout from '@/components/Layout'
 import CreateUserDialog from '@/components/CreateUserDialog'
@@ -7,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/PageState'
 import {
   Users,
   ClipboardList,
@@ -49,16 +51,20 @@ interface AuditEntry {
 const RECENT_USERS_KEY = '/admin/users?limit=5'
 
 export default function AdminDashboardPage() {
+  usePageTitle('Admin Dashboard')
   const navigate = useNavigate()
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [auditError, setAuditError] = useState(false)
   const [showAudit, setShowAudit] = useState(false)
   const [auditLoading, setAuditLoading] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
 
   const fetchData = async (showLoading = true) => {
+    setError(false)
     const cachedStats = readApiCache<SystemStats>('/admin/stats')
     const cachedUsers = readApiCache<{ items: AdminUser[]; total: number }>(RECENT_USERS_KEY)
     const hasCachedData = Boolean(cachedStats) || Boolean(cachedUsers?.items?.length)
@@ -78,18 +84,23 @@ export default function AdminDashboardPage() {
       ])
       setStats(statsRes.data)
       setUsers(usersRes.data.items)
-    } catch { /* ignore */ } finally {
+    } catch {
+      setError(true)
+    } finally {
       setLoading(false)
     }
   }
 
   const fetchAuditLogs = async () => {
     setAuditLoading(true)
+    setAuditError(false)
     try {
       const { data } = await api.get('/admin/audit-logs')
       setAuditLogs(data)
       setShowAudit(true)
-    } catch { /* ignore */ } finally {
+    } catch {
+      setAuditError(true)
+    } finally {
       setAuditLoading(false)
     }
   }
@@ -134,6 +145,12 @@ export default function AdminDashboardPage() {
         allowedRoles={['student', 'lecturer', 'admin']}
         onCreated={() => fetchData(false)}
       />
+
+      {error && (
+        <div className="mb-6">
+          <ErrorState message="Could not load dashboard data." onRetry={() => fetchData(true)} />
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card) => (
@@ -210,6 +227,8 @@ export default function AdminDashboardPage() {
         <CardContent>
           {!showAudit ? (
             <p className="text-sm text-muted-foreground">Click "View Logs" to see recent activity.</p>
+          ) : auditError ? (
+            <ErrorState message="Could not load audit logs." onRetry={fetchAuditLogs} />
           ) : auditLogs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
           ) : (

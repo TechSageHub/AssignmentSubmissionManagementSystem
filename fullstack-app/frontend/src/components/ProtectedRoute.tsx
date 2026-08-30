@@ -1,12 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import FullPageSpinner from '@/components/FullPageSpinner'
 import type { ReactNode } from 'react'
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) return null
+  if (loading) return <FullPageSpinner />
   if (!user) return <Navigate to="/login" replace />
 
   // Force a password change before allowing access to any other page.
@@ -20,7 +21,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 export function LecturerRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
 
-  if (loading) return null
+  if (loading) return <FullPageSpinner />
   if (!user) return <Navigate to="/login" replace />
   if (user.role !== 'lecturer') return <Navigate to="/" replace />
 
@@ -30,7 +31,7 @@ export function LecturerRoute({ children }: { children: ReactNode }) {
 export function AdminRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
 
-  if (loading) return null
+  if (loading) return <FullPageSpinner />
   if (!user) return <Navigate to="/login" replace />
   if (user.role !== 'admin') return <Navigate to="/" replace />
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import api, { readApiCache } from '@/services/api'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import Layout from '@/components/Layout'
 import CreateUserDialog from '@/components/CreateUserDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,6 +44,7 @@ function buildPageNumbers(current: number, last: number): (number | '...')[] {
 }
 
 export default function UserManagementPage() {
+  usePageTitle('User Management')
   const [users, setUsers] = useState<AdminUser[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)

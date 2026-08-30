@@ -4,6 +4,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import { useAuth } from '@/hooks/useAuth'
 import { ProtectedRoute, LecturerRoute, AdminRoute } from '@/components/ProtectedRoute'
 import { Toaster } from '@/components/ui/toaster'
+import FullPageSpinner from '@/components/FullPageSpinner'
 import HomePage from '@/pages/HomePage'
 
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -27,16 +28,12 @@ const LecturerStudentsPage = lazy(() => import('@/pages/LecturerStudentsPage'))
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
 
 function PageFallback() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-    </div>
-  )
+  return <FullPageSpinner />
 }
 
 function RootRedirect() {
   const { user, loading } = useAuth()
-  if (loading) return null
+  if (loading) return <FullPageSpinner />
   return user ? <Navigate to="/dashboard" replace /> : <HomePage />
 }
 

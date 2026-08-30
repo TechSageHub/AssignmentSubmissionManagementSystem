@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Target, Eye, Award } from 'lucide-react'
 
 export default function AboutPage() {
+  usePageTitle('About')
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md">

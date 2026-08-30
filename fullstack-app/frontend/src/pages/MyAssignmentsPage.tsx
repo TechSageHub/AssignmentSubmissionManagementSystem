@@ -1,23 +1,29 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api, { readApiCache } from '@/services/api'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import { toast } from 'sonner'
 import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState, ErrorState } from '@/components/PageState'
 import {
   Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import { Edit3, Eye, Trash2, Plus, Calendar, Users } from 'lucide-react'
 
 export default function MyAssignmentsPage() {
+  usePageTitle('My Assignments')
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    setError(false)
     const cachedAssignments = readApiCache<Assignment[]>('/assignments')
     if (cachedAssignments) {
       setAssignments(cachedAssignments)
@@ -27,12 +33,12 @@ export default function MyAssignmentsPage() {
     api.get('/assignments')
       .then(({ data }) => setAssignments(data))
       .catch(() => {
-        if (!cachedAssignments) setAssignments([])
+        if (!cachedAssignments) setError(true)
       })
       .finally(() => {
         if (!cachedAssignments) setLoading(false)
       })
-  }, [])
+  }, [reloadKey])
 
   const handleDelete = async (id: number) => {
     const previousAssignments = assignments
@@ -77,12 +83,18 @@ export default function MyAssignmentsPage() {
         </Link>
       </div>
 
-      {assignments.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No assignments yet. Create your first one!</p>
-          </CardContent>
-        </Card>
+      {error ? (
+        <ErrorState message="Could not load your assignments." onRetry={() => setReloadKey((k) => k + 1)} />
+      ) : assignments.length === 0 ? (
+        <EmptyState
+          title="No assignments yet"
+          description="Create your first assignment to start receiving submissions."
+          action={
+            <Link to="/assignments/new">
+              <Button variant="outline"><Plus className="mr-2 h-4 w-4" />Create Assignment</Button>
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {assignments.map((a) => (

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import api from '@/services/api'
 import Layout from '@/components/Layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -11,6 +12,7 @@ import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import RubricBuilder from '@/components/RubricBuilder'
 
 export default function CreateAssignmentPage() {
+  usePageTitle('Create Assignment')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')

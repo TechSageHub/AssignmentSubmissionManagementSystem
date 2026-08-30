@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import api, { readApiCache } from '@/services/api'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import Layout from '@/components/Layout'
 import CreateUserDialog from '@/components/CreateUserDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState, EmptyState } from '@/components/PageState'
 import { toast } from 'sonner'
 import { Download, Upload, UserPlus, RefreshCw, Users } from 'lucide-react'
 
@@ -17,11 +19,14 @@ interface Student {
 const TEMPLATE_HEADERS = ['name', 'email', 'password', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
 
 export default function LecturerStudentsPage() {
+  usePageTitle('Students')
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [error, setError] = useState(false)
 
   const fetchStudents = async (showLoading = true) => {
+    setError(false)
     const cachedStudents = readApiCache<Student[]>('/users/students')
     if (cachedStudents) {
       setStudents(cachedStudents)
@@ -33,7 +38,9 @@ export default function LecturerStudentsPage() {
     try {
       const { data } = await api.get('/users/students')
       setStudents(data)
-    } catch { /* ignore */ } finally {
+    } catch {
+      if (!cachedStudents) setError(true)
+    } finally {
       if (!cachedStudents) setLoading(false)
     }
   }
@@ -173,8 +180,13 @@ export default function LecturerStudentsPage() {
         <CardContent>
           {loading ? (
             <div className="space-y-2">{[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 rounded" />)}</div>
+          ) : error ? (
+            <ErrorState message="Could not load the student list." onRetry={() => fetchStudents(true)} />
           ) : students.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No students yet. Click "Add Student" to create one.</p>
+            <EmptyState
+              title="No students yet"
+              description="Click 'Add Student' to create one, or import them in bulk from a CSV."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

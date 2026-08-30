@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/services/api'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import Layout from '@/components/Layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/PageState'
 import FilePreview from '@/components/FilePreview'
 import { ArrowLeft, Save, Eye } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,12 +22,14 @@ interface CriterionScore {
 }
 
 export default function GradeSubmissionPage() {
+  usePageTitle('Grade Submission')
   const { submissionId } = useParams()
   const navigate = useNavigate()
   const [score, setScore] = useState('')
   const [feedback, setFeedback] = useState('')
   const [criteriaScores, setCriteriaScores] = useState<CriterionScore[]>([])
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [submission, setSubmission] = useState<{ student_name: string; original_name: string; assignment_title?: string; assignment_id?: number } | null>(null)
@@ -70,7 +74,7 @@ export default function GradeSubmissionPage() {
           }
         } catch { /* no grade yet */ }
       } catch {
-        navigate('/assignments')
+        setLoadError(true)
       } finally {
         setLoading(false)
       }
@@ -121,6 +125,19 @@ export default function GradeSubmissionPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Skeleton className="h-48 rounded-xl" />
           <Skeleton className="h-64 rounded-xl" />
+        </div>
+      </Layout>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <Layout>
+        <div className="py-10">
+          <ErrorState
+            message="Could not load this submission."
+            onRetry={() => window.location.reload()}
+          />
         </div>
       </Layout>
     )

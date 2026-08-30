@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import api from '@/services/api'
 import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
@@ -12,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft } from 'lucide-react'
 
 export default function EditAssignmentPage() {
+  usePageTitle('Edit Assignment')
   const { id } = useParams()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')

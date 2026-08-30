@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import api from '@/services/api'
 import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
@@ -10,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ErrorState } from '@/components/PageState'
 import { ArrowLeft, Calendar, FileUp, Upload, Edit3, Users, AlertTriangle, X, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -20,12 +22,14 @@ interface StudentOption {
 }
 
 export default function AssignmentDetailPage() {
+  usePageTitle('Assignment')
   const { id } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [showGroupForm, setShowGroupForm] = useState(false)
@@ -36,7 +40,7 @@ export default function AssignmentDetailPage() {
   useEffect(() => {
     api.get(`/assignments/${id}`)
       .then(({ data }) => setAssignment(data))
-      .catch(() => navigate('/assignments'))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
   }, [id, navigate])
 
@@ -91,6 +95,16 @@ export default function AssignmentDetailPage() {
       <Layout>
         <Skeleton className="h-8 w-48 mb-4" />
         <Skeleton className="h-48 rounded-xl" />
+      </Layout>
+    )
+  }
+
+  if (loadError || !assignment) {
+    return (
+      <Layout>
+        <div className="py-10">
+          <ErrorState message="Could not load this assignment." onRetry={() => window.location.reload()} />
+        </div>
       </Layout>
     )
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { usePageTitle } from '@/hooks/usePageTitle'
 import api from '@/services/api'
 import Layout from '@/components/Layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,10 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import { ErrorState } from '@/components/PageState'
 import FilePreview from '@/components/FilePreview'
 import { ArrowLeft, FileText, Award, MessageSquare, Eye } from 'lucide-react'
 
 export default function ViewSubmissionPage() {
+  usePageTitle('Submission')
   const { submissionId } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -27,6 +30,7 @@ export default function ViewSubmissionPage() {
     grade?: { score: number; feedback: string | null; status?: string; criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number }[] }
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,7 +42,7 @@ export default function ViewSubmissionPage() {
         } catch { sub.grade = { score: null, feedback: null, status: 'pending' } }
         setSubmission(sub)
       } catch {
-        navigate('/assignments')
+        setLoadError(true)
       } finally {
         setLoading(false)
       }
@@ -55,7 +59,16 @@ export default function ViewSubmissionPage() {
       </Layout>
     )
   }
-  if (!submission) return null
+
+  if (loadError || !submission) {
+    return (
+      <Layout>
+        <div className="py-10">
+          <ErrorState message="Could not load this submission." onRetry={() => window.location.reload()} />
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout>
