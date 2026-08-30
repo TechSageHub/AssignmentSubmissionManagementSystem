@@ -1,28 +1,38 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/context/AuthContext'
 import { useAuth } from '@/hooks/useAuth'
 import { ProtectedRoute, LecturerRoute, AdminRoute } from '@/components/ProtectedRoute'
 import { Toaster } from '@/components/ui/toaster'
-import LoginPage from '@/pages/LoginPage'
-import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
-import ResetPasswordPage from '@/pages/ResetPasswordPage'
-import ChangePasswordPage from '@/pages/ChangePasswordPage'
-import DashboardPage from '@/pages/DashboardPage'
 import HomePage from '@/pages/HomePage'
-import AboutPage from '@/pages/AboutPage'
-import ContactPage from '@/pages/ContactPage'
-import CreateAssignmentPage from '@/pages/CreateAssignmentPage'
-import EditAssignmentPage from '@/pages/EditAssignmentPage'
-import AssignmentsRouterPage from '@/pages/AssignmentsRouterPage'
-import AssignmentDetailPage from '@/pages/AssignmentDetailPage'
-import AssignmentSubmissionsPage from '@/pages/AssignmentSubmissionsPage'
-import MySubmissionsPage from '@/pages/MySubmissionsPage'
-import GradeSubmissionPage from '@/pages/GradeSubmissionPage'
-import ViewSubmissionPage from '@/pages/ViewSubmissionPage'
-import AdminDashboardPage from '@/pages/AdminDashboardPage'
-import UserManagementPage from '@/pages/UserManagementPage'
-import LecturerStudentsPage from '@/pages/LecturerStudentsPage'
-import ProfilePage from '@/pages/ProfilePage'
+
+const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
+const ChangePasswordPage = lazy(() => import('@/pages/ChangePasswordPage'))
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
+const AboutPage = lazy(() => import('@/pages/AboutPage'))
+const ContactPage = lazy(() => import('@/pages/ContactPage'))
+const CreateAssignmentPage = lazy(() => import('@/pages/CreateAssignmentPage'))
+const EditAssignmentPage = lazy(() => import('@/pages/EditAssignmentPage'))
+const AssignmentsRouterPage = lazy(() => import('@/pages/AssignmentsRouterPage'))
+const AssignmentDetailPage = lazy(() => import('@/pages/AssignmentDetailPage'))
+const AssignmentSubmissionsPage = lazy(() => import('@/pages/AssignmentSubmissionsPage'))
+const MySubmissionsPage = lazy(() => import('@/pages/MySubmissionsPage'))
+const GradeSubmissionPage = lazy(() => import('@/pages/GradeSubmissionPage'))
+const ViewSubmissionPage = lazy(() => import('@/pages/ViewSubmissionPage'))
+const AdminDashboardPage = lazy(() => import('@/pages/AdminDashboardPage'))
+const UserManagementPage = lazy(() => import('@/pages/UserManagementPage'))
+const LecturerStudentsPage = lazy(() => import('@/pages/LecturerStudentsPage'))
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
+
+function PageFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    </div>
+  )
+}
 
 function RootRedirect() {
   const { user, loading } = useAuth()
@@ -32,7 +42,8 @@ function RootRedirect() {
 
 function AppContent() {
   return (
-    <Routes>
+    <Suspense fallback={<PageFallback />}>
+      <Routes>
       {/* Public pages */}
       <Route path="/" element={<RootRedirect />} />
       <Route path="/about" element={<AboutPage />} />
@@ -84,7 +95,8 @@ function AppContent() {
       } />
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   )
 }
 

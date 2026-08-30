@@ -18,4 +18,29 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'react-vendor',
+              test: /node_modules[\\/](react|react-dom|react-router|scheduler)/,
+              priority: 20,
+            },
+            {
+              name: 'recharts',
+              test: /node_modules[\\/](recharts|d3-|victory-vendor)/,
+              priority: 10,
+            },
+            {
+              name: 'ui-vendor',
+              test: /node_modules[\\/](@radix-ui|sonner|class-variance-authority|clsx|tailwind-merge|axios)/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
 })
