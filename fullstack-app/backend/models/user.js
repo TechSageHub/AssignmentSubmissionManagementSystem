@@ -163,6 +163,19 @@ async function findAllStudents() {
   return result.recordset;
 }
 
+async function findStudentsByIds(ids) {
+  if (!ids || ids.length === 0) return [];
+  const idParams = ids.map((_, i) => `@id${i}`).join(',');
+  const params = {};
+  ids.forEach((id, i) => { params[`id${i}`] = id; });
+  const result = await query(
+    `SELECT id, name, email FROM Users
+     WHERE role = 'student' AND (is_active = 1 OR is_active IS NULL) AND id IN (${idParams})`,
+    params
+  );
+  return result.recordset;
+}
+
 async function findByIdWithEmail(id) {
   const result = await query(
     'SELECT id, name, email FROM Users WHERE id = @id',
@@ -203,4 +216,4 @@ async function updateProfile(id, { department, programme, level, phone }) {
   return result.recordset[0] || null;
 }
 
-module.exports = { buildUserFindByIdQuery, isMissingColumnError, findByEmail, findByUsername, findByEmailOrUsername, findById, createUser, findByVerificationToken, verifyUser, setVerificationToken, findAll, updateRole, setActiveStatus, getStats, findAllStudents, findByIdWithEmail, updatePassword, updateProfile };
+module.exports = { buildUserFindByIdQuery, isMissingColumnError, findByEmail, findByUsername, findByEmailOrUsername, findById, createUser, findByVerificationToken, verifyUser, setVerificationToken, findAll, updateRole, setActiveStatus, getStats, findAllStudents, findStudentsByIds, findByIdWithEmail, updatePassword, updateProfile };

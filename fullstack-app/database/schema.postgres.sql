@@ -42,13 +42,14 @@ CREATE INDEX IF NOT EXISTS IX_Assignments_lecturer_id ON Assignments(lecturer_id
 
 CREATE TABLE IF NOT EXISTS Submissions (
     id SERIAL PRIMARY KEY,
-    assignment_id INT NOT NULL REFERENCES Assignments(id),
+    assignment_id INT NOT NULL REFERENCES Assignments(id) ON DELETE CASCADE,
     student_id INT NOT NULL REFERENCES Users(id),
     file_path VARCHAR(500) NOT NULL,
     original_name VARCHAR(255) NOT NULL,
     submitted_at TIMESTAMP DEFAULT NOW(),
     is_late BOOLEAN DEFAULT FALSE,
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (assignment_id, student_id)
 );
 
 CREATE INDEX IF NOT EXISTS IX_Submissions_assignment_id ON Submissions(assignment_id);
@@ -68,7 +69,7 @@ CREATE INDEX IF NOT EXISTS IX_SubmissionFiles_submission_id ON SubmissionFiles(s
 
 CREATE TABLE IF NOT EXISTS Grades (
     id SERIAL PRIMARY KEY,
-    submission_id INT NOT NULL UNIQUE REFERENCES Submissions(id),
+    submission_id INT NOT NULL UNIQUE REFERENCES Submissions(id) ON DELETE CASCADE,
     score DECIMAL(5,2) NOT NULL CHECK (score >= 0 AND score <= 100),
     feedback TEXT,
     graded_at TIMESTAMP DEFAULT NOW(),
@@ -89,10 +90,12 @@ CREATE TABLE IF NOT EXISTS GradeCriteria (
     id SERIAL PRIMARY KEY,
     grade_id INT NOT NULL REFERENCES Grades(id) ON DELETE CASCADE,
     criteria_id INT NOT NULL REFERENCES RubricCriteria(id),
-    score DECIMAL(5,2) NOT NULL CHECK (score >= 0)
+    score DECIMAL(5,2) NOT NULL CHECK (score >= 0),
+    UNIQUE (grade_id, criteria_id)
 );
 
 CREATE INDEX IF NOT EXISTS IX_GradeCriteria_grade_id ON GradeCriteria(grade_id);
+CREATE INDEX IF NOT EXISTS IX_GradeCriteria_criteria_id ON GradeCriteria(criteria_id);
 
 CREATE TABLE IF NOT EXISTS GroupMembers (
     id SERIAL PRIMARY KEY,
@@ -133,6 +136,17 @@ CREATE TABLE IF NOT EXISTS Notifications (
 
 CREATE INDEX IF NOT EXISTS IX_Notifications_user_id ON Notifications(user_id);
 CREATE INDEX IF NOT EXISTS IX_Notifications_unread ON Notifications(user_id, is_read);
+
+CREATE TABLE IF NOT EXISTS ReminderLog (
+    id SERIAL PRIMARY KEY,
+    assignment_id INT NOT NULL REFERENCES Assignments(id) ON DELETE CASCADE,
+    student_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+    sent_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (assignment_id, student_id)
+);
+
+CREATE INDEX IF NOT EXISTS IX_ReminderLog_assignment_id ON ReminderLog(assignment_id);
+CREATE INDEX IF NOT EXISTS IX_ReminderLog_student_id ON ReminderLog(student_id);
 
 CREATE TABLE IF NOT EXISTS SystemConfig (
     key VARCHAR(100) PRIMARY KEY,

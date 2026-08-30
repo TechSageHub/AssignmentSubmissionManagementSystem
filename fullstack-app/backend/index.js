@@ -9,10 +9,22 @@ const systemConfigModel = require('./models/systemConfig');
 
 const app = express();
 
+if (process.env.RATE_LIMIT_TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.resolve(__dirname, config.uploadPath)));
+
+// Uploaded files are NEVER served statically. They are only streamed through the
+// authorized endpoint /api/submissions/:submissionId/file (see submissionController).
+app.use('/uploads', (_req, res) => {
+  res.status(404).json({ error: 'NotFoundError', details: 'Use the authenticated file endpoint' });
+});
+
+const { globalLimiter } = require('./middleware/rateLimit');
+app.use('/api', globalLimiter);
 
 const authRoutes = require('./routes/auth');
 const assignmentRoutes = require('./routes/assignments');

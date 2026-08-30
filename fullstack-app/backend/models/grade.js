@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query, isDuplicateKeyError } = require('../config/db');
 
 async function upsert({ submissionId, score, feedback }) {
   const existing = await query('SELECT * FROM Grades WHERE submission_id = @submissionId', { submissionId });
@@ -11,13 +11,28 @@ async function upsert({ submissionId, score, feedback }) {
     );
     return result.recordset[0];
   }
-  const result = await query(
-    `INSERT INTO Grades (submission_id, score, feedback)
-     OUTPUT INSERTED.*
-     VALUES (@submissionId, @score, @feedback)`,
-    { submissionId, score, feedback }
-  );
-  return result.recordset[0];
+  try {
+    const result = await query(
+      `INSERT INTO Grades (submission_id, score, feedback)
+       OUTPUT INSERTED.*
+       VALUES (@submissionId, @score, @feedback)`,
+      { submissionId, score, feedback }
+    );
+    return result.recordset[0];
+  } catch (err) {
+    // A concurrent request inserted the grade between our SELECT and INSERT.
+    // This is now safe thanks to UNIQUE(submission_id) — convert the race into an UPDATE.
+    if (isDuplicateKeyError(err)) {
+      const result = await query(
+        `UPDATE Grades SET score = @score, feedback = @feedback, updated_at = GETDATE()
+         OUTPUT INSERTED.*
+         WHERE submission_id = @submissionId`,
+        { submissionId, score, feedback }
+      );
+      return result.recordset[0];
+    }
+    throw err;
+  }
 }
 
 async function findBySubmission(submissionId) {

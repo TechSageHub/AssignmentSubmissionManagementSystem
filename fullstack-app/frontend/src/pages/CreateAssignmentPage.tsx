@@ -32,7 +32,7 @@ export default function CreateAssignmentPage() {
       const { data } = await api.post('/assignments', {
         title: title.trim(),
         description,
-        due_date: dueDate,
+        due_date: new Date(dueDate).toISOString(),
         course_code: courseCode.trim() || undefined,
         course_title: courseTitle.trim() || undefined,
       })

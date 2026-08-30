@@ -1,10 +1,19 @@
 const { query } = require('../config/db');
+const assignmentModel = require('../models/assignment');
 
 async function getAssignmentAnalytics(req, res, next) {
   try {
     const assignmentId = parseInt(req.params.id, 10);
     if (isNaN(assignmentId)) {
       return res.status(400).json({ error: 'ValidationError', details: 'Invalid assignment ID' });
+    }
+
+    const assignment = await assignmentModel.findById(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({ error: 'NotFoundError', details: 'Assignment not found' });
+    }
+    if (assignment.lecturer_id !== req.user.id) {
+      return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
     }
 
     const grades = await query(
@@ -36,7 +45,7 @@ async function getAssignmentAnalytics(req, res, next) {
     }
 
     const totalGraded = scores.length;
-    const totalSubmissions = submissionCount.recordset[0].count;
+    const totalSubmissions = Number(submissionCount.recordset[0].count);
     const sorted = [...scores].sort((a, b) => a - b);
     const sum = sorted.reduce((a, b) => a + b, 0);
 

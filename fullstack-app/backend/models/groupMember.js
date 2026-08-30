@@ -44,4 +44,12 @@ async function removeBySubmission(submissionId) {
   await query('DELETE FROM GroupMembers WHERE submission_id = @submissionId', { submissionId });
 }
 
-module.exports = { addMembers, findBySubmission, findBySubmissions, removeBySubmission };
+async function isMember(submissionId, userId) {
+  const result = await query(
+    'SELECT 1 FROM GroupMembers WHERE submission_id = @submissionId AND user_id = @userId',
+    { submissionId, userId }
+  );
+  return result.recordset.length > 0;
+}
+
+module.exports = { addMembers, findBySubmission, findBySubmissions, removeBySubmission, isMember };

@@ -4,8 +4,12 @@ const assignmentModel = require('../models/assignment');
 const submissionModel = require('../models/submission');
 const submissionFileModel = require('../models/submissionFile');
 const groupMemberModel = require('../models/groupMember');
+const userModel = require('../models/user');
 const { sendSubmissionConfirmation } = require('../utils/emailHelper');
 const { notifySubmissionConfirmed } = require('../utils/notificationHelper');
+const { assertSubmissionAssignmentOwner } = require('../utils/authorization');
+const { parseInputDate, toIsoUtc } = require('../utils/dates');
+const { withTransaction, isDuplicateKeyError } = require('../config/db');
 
 async function submitAssignment(req, res, next) {
   try {
@@ -29,53 +33,106 @@ async function submitAssignment(req, res, next) {
       }
     }
 
-    const isLate = new Date() > new Date(assignment.due_date);
+    const isLate = new Date() > parseInputDate(assignment.due_date);
 
-    const existing = await submissionModel.findByAssignmentAndStudent(assignmentId, req.user.id);
-    if (existing) {
-      const oldPath = path.resolve(__dirname, '..', existing.file_path);
-      try { fs.unlinkSync(oldPath); } catch { /* file may not exist */ }
-      await submissionModel.remove(existing.id);
-    }
-
-    const submission = await submissionModel.create({
-      assignmentId,
-      studentId: req.user.id,
-      filePath: path.join('uploads', 'assignments', String(assignmentId), req.files[0].filename),
-      originalName: req.files[0].originalname,
-      isLate,
-    });
-
-    const storedFiles = await submissionFileModel.createMany(submission.id, req.files.map(file => ({
-      filePath: path.join('uploads', 'assignments', String(assignmentId), file.filename),
-      originalName: file.originalname,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-    })));
-
-    // Add group members if provided
-    const groupMemberIds = req.body.group_member_ids;
-    if (Array.isArray(groupMemberIds) && groupMemberIds.length > 0) {
-      const validIds = groupMemberIds.map(Number).filter(id => !isNaN(id) && id !== req.user.id);
-      if (validIds.length > 0) {
-        await groupMemberModel.addMembers(submission.id, validIds);
+    // Validate proposed group members: real, active students who have not already
+    // submitted this assignment. Invalid ids are silently dropped.
+    let groupMemberIds = [];
+    const rawIds = req.body.group_member_ids;
+    if (Array.isArray(rawIds) && rawIds.length > 0) {
+      const candidateIds = [...new Set(rawIds.map(Number).filter(id => !isNaN(id) && id !== req.user.id))];
+      if (candidateIds.length > 0) {
+        const validStudents = await userModel.findStudentsByIds(candidateIds);
+        const submitted = await submissionModel.findByAssignment(assignmentId);
+        const alreadySubmittedIds = new Set(submitted.map(s => s.student_id));
+        groupMemberIds = validStudents.map(s => s.id).filter(id => !alreadySubmittedIds.has(id));
       }
     }
 
-    // Load group members and files for response
-    const members = await groupMemberModel.findBySubmission(submission.id);
-    const files = await submissionFileModel.findBySubmission(submission.id);
-    submission.group_members = members;
-    submission.files = files;
+    let result;
+    try {
+      result = await withTransaction(async ({ exec }) => {
+        const existing = await exec(
+          'SELECT * FROM Submissions WHERE assignment_id = @assignmentId AND student_id = @studentId',
+          { assignmentId, studentId: req.user.id }
+        );
+
+        let orphanedFiles = [];
+        if (existing.recordset[0]) {
+          const oldRows = await exec(
+            'SELECT file_path FROM SubmissionFiles WHERE submission_id = @oldId',
+            { oldId: existing.recordset[0].id }
+          );
+          orphanedFiles = oldRows.recordset.map(r => r.file_path);
+          orphanedFiles.push(existing.recordset[0].file_path);
+          await exec('DELETE FROM Submissions WHERE id = @oldId', { oldId: existing.recordset[0].id });
+        }
+
+        const created = await exec(
+          `INSERT INTO Submissions (assignment_id, student_id, file_path, original_name, is_late)
+           OUTPUT INSERTED.*
+           VALUES (@assignmentId, @studentId, @filePath, @originalName, @isLate)`,
+          {
+            assignmentId,
+            studentId: req.user.id,
+            filePath: path.join('uploads', 'assignments', String(assignmentId), req.files[0].filename),
+            originalName: req.files[0].originalname,
+            isLate,
+          }
+        );
+        const submission = created.recordset[0];
+
+        for (const file of req.files) {
+          await exec(
+            `INSERT INTO SubmissionFiles (submission_id, file_path, original_name, file_size, mime_type)
+             OUTPUT INSERTED.*
+             VALUES (@submissionId, @filePath, @originalName, @fileSize, @mimeType)`,
+            {
+              submissionId: submission.id,
+              filePath: path.join('uploads', 'assignments', String(assignmentId), file.filename),
+              originalName: file.originalname,
+              fileSize: file.size ?? 0,
+              mimeType: file.mimetype || null,
+            }
+          );
+        }
+
+        for (const userId of groupMemberIds) {
+          await exec(
+            'INSERT INTO GroupMembers (submission_id, user_id) VALUES (@submissionId, @userId)',
+            { submissionId: submission.id, userId }
+          );
+        }
+
+        return { submission, orphanedFiles };
+      });
+    } catch (err) {
+      // Concurrent duplicate: another request already created this student's submission.
+      if (isDuplicateKeyError(err)) {
+        return res.status(409).json({ error: 'ValidationError', details: 'You have already submitted this assignment' });
+      }
+      throw err;
+    }
+
+    // Commit succeeded — remove the replaced submission's disk files (best effort).
+    for (const fp of result.orphanedFiles || []) {
+      const abs = path.resolve(__dirname, '..', fp);
+      try { fs.unlinkSync(abs); } catch { /* ignore */ }
+    }
+
+    const members = await groupMemberModel.findBySubmission(result.submission.id);
+    const files = await submissionFileModel.findBySubmission(result.submission.id);
+    result.submission.group_members = members;
+    result.submission.files = files;
 
     try {
-      await notifySubmissionConfirmed(req.user.id, assignment.title, submission.id);
+      await notifySubmissionConfirmed(req.user.id, assignment.title, result.submission.id);
       await sendSubmissionConfirmation(req.user.email, req.user.name, assignment.title, isLate);
     } catch (emailErr) {
       console.error('Failed to send submission confirmation email:', emailErr.message);
     }
 
-    res.status(201).json({ message: 'Files submitted successfully', submission });
+    res.status(201).json({ message: 'Files submitted successfully', submission: result.submission });
   } catch (err) {
     next(err);
   }
@@ -124,6 +181,9 @@ async function getMySubmissions(req, res, next) {
     const grouped = await groupMemberModel.findBySubmissions(ids);
     for (const sub of submissions) {
       sub.group_members = grouped[sub.id] || [];
+      if (sub.due_date != null) {
+        sub.due_date = toIsoUtc(sub.due_date);
+      }
     }
     res.json(submissions);
   } catch (err) {
@@ -133,17 +193,29 @@ async function getMySubmissions(req, res, next) {
 
 async function getSubmission(req, res, next) {
   try {
-    const submission = await submissionModel.findById(req.params.submissionId);
+    const submissionId = parseInt(req.params.submissionId, 10);
+    if (isNaN(submissionId)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid submission ID' });
+    }
+
+    const submission = await submissionModel.findById(submissionId);
     if (!submission) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Submission not found' });
     }
 
-    if (req.user.role === 'student' && submission.student_id !== req.user.id) {
-      // Check if student is a group member
-      const members = await groupMemberModel.findBySubmission(submission.id);
-      const isMember = members.some(m => m.user_id === req.user.id);
-      if (!isMember) {
-        return res.status(403).json({ error: 'AuthorizationError', details: 'Not your submission' });
+    if (req.user.role === 'student') {
+      // Check if student is the owner or a group member
+      if (submission.student_id !== req.user.id) {
+        const members = await groupMemberModel.findBySubmission(submission.id);
+        const isMember = members.some(m => m.user_id === req.user.id);
+        if (!isMember) {
+          return res.status(403).json({ error: 'AuthorizationError', details: 'Not your submission' });
+        }
+      }
+    } else if (req.user.role === 'lecturer') {
+      const ownership = await assertSubmissionAssignmentOwner(req.user.id, submission);
+      if (!ownership.ok) {
+        return res.status(ownership.status).json({ error: 'AuthorizationError', details: ownership.message });
       }
     }
 
@@ -197,15 +269,15 @@ async function getSubmissionFile(req, res, next) {
     const ext = path.extname(selectedFile.original_name).toLowerCase();
     const mimeMap = {
       '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-      '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+      '.gif': 'image/gif', '.webp': 'image/webp',
       '.pdf': 'application/pdf',
       '.txt': 'text/plain', '.csv': 'text/csv',
-      '.html': 'text/html', '.htm': 'text/html',
     };
     const contentType = mimeMap[ext] || 'application/octet-stream';
 
+    const safeName = String(selectedFile.original_name).replace(/["\\\r\n]/g, '_');
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${selectedFile.original_name}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
     res.setHeader('Content-Length', fs.statSync(filePath).size);
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {

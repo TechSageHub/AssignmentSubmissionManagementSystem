@@ -28,9 +28,11 @@ export default function EditAssignmentPage() {
       .then(({ data }: { data: Assignment }) => {
         setTitle(data.title)
         setDescription(data.description || '')
-        // Format the date directly without timezone conversion
-        // The datetime-local input expects "YYYY-MM-DDTHH:mm" format
-        const dateStr = data.due_date.replace(' ', 'T').slice(0, 16)
+        // The API returns an ISO instant (with Z); prefill the datetime-local
+        // input using the user's local wall-clock time.
+        const d = new Date(data.due_date)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
         setDueDate(dateStr)
         setCourseCode((data as any).course_code || '')
         setCourseTitle((data as any).course_title || '')
@@ -48,7 +50,7 @@ export default function EditAssignmentPage() {
       await api.put(`/assignments/${id}`, {
         title: title.trim(),
         description,
-        due_date: dueDate,
+        due_date: new Date(dueDate).toISOString(),
         course_code: courseCode.trim() || undefined,
         course_title: courseTitle.trim() || undefined,
       })

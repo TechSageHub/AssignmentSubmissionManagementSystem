@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import { Edit3, Eye, Trash2, Plus, Calendar, Users } from 'lucide-react'
 
@@ -120,7 +120,6 @@ export default function MyAssignmentsPage() {
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         disabled={deletingId === a.id}
-                        onClick={() => handleDelete(a.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -131,7 +130,9 @@ export default function MyAssignmentsPage() {
                       </DialogHeader>
                       <p className="text-sm text-muted-foreground">Are you sure you want to delete "{a.title}"? This action cannot be undone.</p>
                       <div className="flex justify-end gap-2 mt-4">
-                        <Button variant="outline" onClick={() => {}}>Cancel</Button>
+                        <DialogClose asChild>
+                          <Button variant="outline">Cancel</Button>
+                        </DialogClose>
                         <Button variant="destructive" onClick={() => handleDelete(a.id)} disabled={deletingId === a.id}>
                           {deletingId === a.id ? 'Deleting...' : 'Delete'}
                         </Button>

@@ -1,15 +1,21 @@
 const cron = require('node-cron');
 const { query } = require('../config/db');
 const { sendDeadlineReminder } = require('../utils/emailHelper');
-
-// Track which reminders have been sent to avoid duplicates
-const reminded = new Set();
+const { toStoredUtc } = require('../utils/dates');
 
 async function checkDeadlines() {
   try {
-    const now = new Date();
-    const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    // Boundaries are naive UTC wall-clock strings (matching how due_date is
+    // stored), so the comparison is exact on both SQL Server and Postgres
+    // regardless of driver/Type conversions.
+    const now = toStoredUtc(new Date());
+    const in24Hours = toStoredUtc(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
+    // Eligible students: active students with an un-submitted assignment due within
+    // 24h, excluding pairs already persisted in ReminderLog. Persisting the log
+    // means a restart can never re-send the same reminder (the old in-memory Set
+    // was wiped on every restart). Emails that fail to send are NOT logged, so the
+    // next hourly run naturally retries them.
     const result = await query(
       `SELECT a.id AS assignment_id, a.title, a.due_date,
               u.id AS student_id, u.name AS student_name, u.email AS student_email
@@ -22,17 +28,21 @@ async function checkDeadlines() {
          AND NOT EXISTS (
            SELECT 1 FROM Submissions s
            WHERE s.assignment_id = a.id AND s.student_id = u.id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM ReminderLog rl
+           WHERE rl.assignment_id = a.id AND rl.student_id = u.id
          )`,
       { now, in24Hours }
     );
 
     for (const row of result.recordset) {
-      const key = `${row.assignment_id}-${row.student_id}`;
-      if (reminded.has(key)) continue;
-
       try {
         await sendDeadlineReminder(row.student_email, row.student_name, row.title, row.due_date);
-        reminded.add(key);
+        await query(
+          'INSERT INTO ReminderLog (assignment_id, student_id) VALUES (@assignmentId, @studentId)',
+          { assignmentId: row.assignment_id, studentId: row.student_id }
+        );
       } catch (err) {
         console.error(`Failed to send reminder to ${row.student_email}:`, err.message);
       }
@@ -50,4 +60,4 @@ function start() {
   console.log('Reminder service started (hourly check)');
 }
 
-module.exports = { start };
+module.exports = { start, checkDeadlines };

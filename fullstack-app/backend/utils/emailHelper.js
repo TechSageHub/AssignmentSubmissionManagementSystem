@@ -1,6 +1,14 @@
 const { sendEmail } = require('../config/email');
 const config = require('../config/env');
+const { parseInputDate } = require('./dates');
 const baseUrl = config.frontendUrl;
+
+function formatDueDate(value) {
+  const parsed = parseInputDate(value);
+  if (!parsed) return String(value);
+  // Always render in UTC so the instant is unambiguous for readers in any zone.
+  return `${parsed.toLocaleString('en-GB', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} (UTC)`;
+}
 
 async function sendAssignmentCreated(studentEmail, studentName, assignmentTitle, dueDate, lecturerName) {
   await sendEmail({
@@ -12,7 +20,7 @@ async function sendAssignmentCreated(studentEmail, studentName, assignmentTitle,
       <p>Lecturer <strong>${lecturerName}</strong> has posted a new assignment:</p>
       <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
         <h3 style="margin: 0 0 8px;">${assignmentTitle}</h3>
-        <p style="color: #64748b; font-size: 14px;">Due: <strong>${new Date(dueDate).toLocaleString()}</strong></p>
+        <p style="color: #64748b; font-size: 14px;">Due: <strong>${formatDueDate(dueDate)}</strong></p>
       </div>
       <p><a href="${baseUrl}/assignments" style="background: #6366f1; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none;">View Assignment</a></p>
       <p style="color: #94a3b8; font-size: 12px;">You are receiving this because you are registered on ASMS.</p>
@@ -61,7 +69,7 @@ async function sendDeadlineReminder(studentEmail, studentName, assignmentTitle, 
       <p>Hi <strong>${studentName}</strong>,</p>
       <p>This is a reminder that <strong>${assignmentTitle}</strong> is due in less than 24 hours.</p>
       <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
-        <p style="margin: 0; font-size: 14px;">Due: <strong>${new Date(dueDate).toLocaleString()}</strong></p>
+        <p style="margin: 0; font-size: 14px;">Due: <strong>${formatDueDate(dueDate)}</strong></p>
       </div>
       <p><a href="${baseUrl}/assignments" style="background: #6366f1; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none;">Submit Now</a></p>
       <p style="color: #94a3b8; font-size: 12px;">You are receiving this because you are registered on ASMS.</p>

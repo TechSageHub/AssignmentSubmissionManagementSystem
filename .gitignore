@@ -9,3 +9,6 @@ Thumbs.db
 stderr.txt
 stdout.txt
 .vercel
+
+.vercel
+.env*

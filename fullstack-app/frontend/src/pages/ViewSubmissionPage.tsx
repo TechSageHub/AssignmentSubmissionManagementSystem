@@ -116,9 +116,24 @@ export default function ViewSubmissionPage() {
                   <div key={file.id} className="rounded-lg border p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-medium truncate">{file.original_name}</p>
-                      <a href={`/api/submissions/${submission.id}/file?fileId=${file.id}`} target="_blank" rel="noreferrer" className="text-sm text-primary underline">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const response = await api.get(`/submissions/${submission.id}/file`, {
+                              params: { fileId: file.id },
+                              responseType: 'blob',
+                            })
+                            const url = URL.createObjectURL(response.data)
+                            window.open(url, '_blank')
+                          } catch (err) {
+                            console.error('Failed to open file:', err)
+                          }
+                        }}
+                        className="text-sm text-primary underline"
+                      >
                         Open
-                      </a>
+                      </button>
                     </div>
                     <FilePreview submissionId={submission.id} fileName={file.original_name} fileId={file.id} />
                   </div>

@@ -2,7 +2,15 @@ const assignmentModel = require('../models/assignment');
 const userModel = require('../models/user');
 const { sendAssignmentCreated } = require('../utils/emailHelper');
 const { notifyAssignmentCreated } = require('../utils/notificationHelper');
+const { parseInputDate, toStoredUtc, toIsoUtc } = require('../utils/dates');
 const auditLog = require('../utils/auditLogger');
+
+function withUtcDueDate(row) {
+  if (row && row.due_date != null) {
+    row.due_date = toIsoUtc(row.due_date);
+  }
+  return row;
+}
 
 async function createAssignment(req, res, next) {
   try {
@@ -18,8 +26,13 @@ async function createAssignment(req, res, next) {
       return res.status(400).json({ error: 'ValidationError', details: 'Due date is required' });
     }
 
-    // Convert datetime-local format to Date, handling timezone correctly
-    const dueDateTime = new Date(due_date + ':00'); // Add seconds for proper parsing
+    // The client sends an ISO instant (with Z). Legacy naive "YYYY-MM-DDTHH:mm"
+    // values are treated as UTC. Store a naive UTC wall-clock and require it to
+    // be in the future.
+    const dueDateTime = parseInputDate(due_date);
+    if (!dueDateTime) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Due date must be a valid date and time' });
+    }
     if (dueDateTime <= new Date()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Due date must be in the future' });
     }
@@ -28,7 +41,7 @@ async function createAssignment(req, res, next) {
       lecturerId: req.user.id,
       title: title.trim(),
       description: description || null,
-      dueDate: dueDateTime,
+      dueDate: toStoredUtc(dueDateTime),
       courseCode: course_code || null,
       courseTitle: course_title || null,
     });
@@ -40,7 +53,7 @@ async function createAssignment(req, res, next) {
       const studentIds = students.map(s => s.id);
       await notifyAssignmentCreated(studentIds, title, assignment.id);
       for (const student of students) {
-        await sendAssignmentCreated(student.email, student.name, title, due_date, lecturerName);
+        await sendAssignmentCreated(student.email, student.name, title, dueDateTime, lecturerName);
       }
     } catch (emailErr) {
       console.error('Failed to send assignment notification emails:', emailErr.message);
@@ -48,7 +61,7 @@ async function createAssignment(req, res, next) {
 
     auditLog.log(req, 'create', 'assignment', assignment.id, { title });
 
-    res.status(201).json(assignment);
+    res.status(201).json(withUtcDueDate(assignment));
   } catch (err) {
     next(err);
   }
@@ -57,7 +70,7 @@ async function createAssignment(req, res, next) {
 async function getAssignments(req, res, next) {
   try {
     const assignments = await assignmentModel.findAll(req.user.id, req.user.role);
-    res.json(assignments);
+    res.json(assignments.map(withUtcDueDate));
   } catch (err) {
     next(err);
   }
@@ -69,7 +82,7 @@ async function getAssignment(req, res, next) {
     if (!assignment) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Assignment not found' });
     }
-    res.json(assignment);
+    res.json(withUtcDueDate(assignment));
   } catch (err) {
     next(err);
   }
@@ -90,12 +103,20 @@ async function updateAssignment(req, res, next) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
     }
 
-    // Handle due_date: convert string directly without timezone issues
+    // Keep stored value unless a new date is supplied. When supplied, parse the
+    // ISO/naive value as UTC and require it to be in the future.
     let dueDate = assignment.due_date;
     if (due_date) {
-      // The datetime-local input sends "YYYY-MM-DDTHH:mm" format
-      // Convert to proper Date format for database storage
-      dueDate = new Date(due_date + ':00'); // Add seconds for proper parsing
+      const parsed = parseInputDate(due_date);
+      if (!parsed) {
+        return res.status(400).json({ error: 'ValidationError', details: 'Due date must be a valid date and time' });
+      }
+      if (parsed <= new Date()) {
+        return res.status(400).json({ error: 'ValidationError', details: 'Due date must be in the future' });
+      }
+      dueDate = toStoredUtc(parsed);
+    } else {
+      dueDate = toStoredUtc(assignment.due_date);
     }
 
     const updated = await assignmentModel.update(req.params.id, {
@@ -106,7 +127,7 @@ async function updateAssignment(req, res, next) {
       courseTitle: course_title !== undefined ? course_title : assignment.course_title,
     });
 
-    res.json(updated);
+    res.json(withUtcDueDate(updated));
   } catch (err) {
     next(err);
   }

@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 
 const Dialog = DialogPrimitive.Root
 const DialogTrigger = DialogPrimitive.Trigger
+const DialogClose = DialogPrimitive.Close
 
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
@@ -43,4 +44,4 @@ const DialogTitle = React.forwardRef<
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
-export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle }
+export { Dialog, DialogTrigger, DialogClose, DialogContent, DialogHeader, DialogTitle }

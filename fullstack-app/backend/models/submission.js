@@ -27,9 +27,11 @@ async function findAll(lecturerId) {
 
 async function findByAssignment(assignmentId) {
   const result = await query(
-    `SELECT s.*, u.name AS student_name
+    `SELECT s.*, u.name AS student_name,
+            g.score, g.feedback, g.graded_at AS grade_graded_at
      FROM Submissions s
      JOIN Users u ON u.id = s.student_id
+     LEFT JOIN Grades g ON g.submission_id = s.id
      WHERE s.assignment_id = @assignmentId
      ORDER BY s.submitted_at DESC`,
     { assignmentId }
@@ -45,6 +47,9 @@ async function findByStudent(studentId) {
      JOIN Assignments a ON a.id = s.assignment_id
      LEFT JOIN Grades g ON g.submission_id = s.id
      WHERE s.student_id = @studentId
+        OR EXISTS (
+            SELECT 1 FROM GroupMembers gm WHERE gm.submission_id = s.id AND gm.user_id = @studentId
+        )
      ORDER BY s.submitted_at DESC`,
     { studentId }
   );

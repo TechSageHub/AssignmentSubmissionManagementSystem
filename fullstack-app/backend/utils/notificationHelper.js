@@ -30,17 +30,19 @@ async function notifySubmissionConfirmed(userId, assignmentTitle, submissionId) 
   }
 }
 
-async function notifyGradeReleased(studentId, assignmentTitle, submissionId) {
-  try {
-    await notificationModel.create({
-      userId: studentId,
-      type: 'grade_released',
-      title: 'Grade Released',
-      message: `Your grade for "${assignmentTitle}" has been released. Check your results.`,
-      link: `/submissions/${submissionId}`,
-    });
-  } catch (err) {
-    console.error('Failed to create notification:', err.message);
+async function notifyGradeReleased(userIds, assignmentTitle, submissionId) {
+  for (const userId of [...new Set(userIds)]) {
+    try {
+      await notificationModel.create({
+        userId,
+        type: 'grade_released',
+        title: 'Grade Released',
+        message: `Your grade for "${assignmentTitle}" has been released. Check your results.`,
+        link: `/submissions/${submissionId}`,
+      });
+    } catch (err) {
+      console.error('Failed to create notification:', err.message);
+    }
   }
 }
 

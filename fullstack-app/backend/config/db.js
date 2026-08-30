@@ -11,6 +11,24 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Only reconnect-and-retry on transport-level failures. Deterministic errors
+// (unique violations, type errors) must NOT be retried — a blind retry can
+// re-execute a committed INSERT and duplicate the write.
+function isConnectionError(err) {
+  if (!err) return false;
+  const msg = (err.message || '').toLowerCase();
+  if (!msg) return false;
+  return /connection|timeout|econnrefused|econnreset|etimedout|socket hang up|pool destroyed|backend closed the connection|server closed the connection|client has encountered a connection error|sqlserver has gone away/i.test(msg);
+}
+
+function isDuplicateKeyError(err) {
+  if (!err) return false;
+  if (err.code === '23505') return true; // PostgreSQL unique violation
+  if (err.number === 2627 || err.number === 2601) return true; // SQL Server unique / dup index
+  const msg = (err.message || '') + ' ' + (err.originalError && err.originalError.message || '');
+  return /duplicate key|unique constraint|violation of (unique key|primary key)|cannot insert duplicate/i.test(msg);
+}
+
 function startKeepAlive() {
   if (keepAliveTimer) clearInterval(keepAliveTimer);
   keepAliveTimer = setInterval(async () => {
@@ -162,6 +180,7 @@ async function pgQuery(queryText, params = {}) {
       };
     } catch (err) {
       lastError = err;
+      if (!isConnectionError(err)) throw err;
       try { if (pool) await pool.end(); } catch { }
       pool = null;
       if (attempt < maxAttempts - 1) await sleep(500);
@@ -183,6 +202,7 @@ async function mssqlQuery(queryText, params = {}) {
       return await request.query(queryText);
     } catch (err) {
       lastError = err;
+      if (!isConnectionError(err)) throw err;
       try { if (pool) await pool.close(); } catch { }
       pool = null;
       if (attempt < maxAttempts - 1) await sleep(500);
@@ -196,4 +216,57 @@ async function query(queryText, params = {}) {
   return mssqlQuery(queryText, params);
 }
 
-module.exports = { getPool, query, sql: dbType === 'postgres' ? null : mssql };
+// Run several statements atomically. `fn` receives { exec } — a query runner
+// bound to the transaction that accepts the same @param syntax as `query()`.
+// Rolls back on any error. Only use for multi-statement writes.
+async function withTransaction(fn) {
+  if (dbType === 'postgres') return withPgTransaction(fn);
+  return withMssqlTransaction(fn);
+}
+
+async function withMssqlTransaction(fn) {
+  const p = await getMssqlPool();
+  const tx = p.transaction();
+  await tx.begin();
+  try {
+    const exec = async (queryText, params = {}) => {
+      const request = tx.request();
+      Object.entries(params).forEach(([key, value]) => request.input(key, value));
+      return request.query(queryText);
+    };
+    const result = await fn({ exec });
+    await tx.commit();
+    return result;
+  } catch (err) {
+    try { await tx.rollback(); } catch { }
+    throw err;
+  }
+}
+
+async function withPgTransaction(fn) {
+  let client = null;
+  try {
+    client = await (await getPgPool()).connect();
+    await client.query('BEGIN');
+    const exec = async (queryText, params = {}) => {
+      const { text, values } = convertPgSql(queryText, params);
+      const result = await client.query(text, values);
+      return {
+        recordset: result.rows,
+        rows: result.rows,
+        rowsAffected: [result.rowCount],
+        rowCount: result.rowCount,
+      };
+    };
+    const result = await fn({ exec });
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    try { if (client) await client.query('ROLLBACK'); } catch { }
+    throw err;
+  } finally {
+    if (client) client.release();
+  }
+}
+
+module.exports = { getPool, query, withTransaction, isConnectionError, isDuplicateKeyError, sql: dbType === 'postgres' ? null : mssql };

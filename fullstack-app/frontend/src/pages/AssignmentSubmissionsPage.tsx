@@ -42,6 +42,29 @@ export default function AssignmentSubmissionsPage() {
   const [bulkScore, setBulkScore] = useState('')
   const [bulkFeedback, setBulkFeedback] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadAll = async () => {
+    setDownloading(true)
+    try {
+      const res = await api.get(`/assignments/${id}/download-all`, { responseType: 'blob' })
+      const disposition = res.headers['content-disposition'] || ''
+      const match = disposition.match(/filename="?([^";]+)"?/i)
+      const filename = match ? match[1] : `assignment_${id}_submissions.zip`
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download submissions')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -134,12 +157,10 @@ export default function AssignmentSubmissionsPage() {
         </div>
         <div className="flex items-center gap-2">
           {rows.length > 0 && (
-            <a href={`/api/assignments/${id}/download-all`}>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Download className="h-4 w-4" />
-                Download All
-              </Button>
-            </a>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadAll} disabled={downloading}>
+              <Download className="h-4 w-4" />
+              {downloading ? 'Downloading...' : 'Download All'}
+            </Button>
           )}
           <div className="flex gap-1 rounded-lg border p-1">
             <Button
