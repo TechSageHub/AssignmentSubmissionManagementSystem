@@ -68,6 +68,8 @@ test('convertPgSql rewrites GETDATE, bit assignment and bracketed idents', () =>
   assert.equal(text, 'UPDATE Users SET is_verified = true, last_login = NOW() WHERE id = $1');
   const ident = convertPgSql('SELECT [id], [name] FROM [Users]', {});
   assert.equal(ident.text, 'SELECT "id", "name" FROM "Users"');
+  const blobQuery = convertPgSql('SELECT [key], [data] FROM [StorageBlobs] WHERE [key] = @key', { key: 'test/file.pdf' });
+  assert.equal(blobQuery.text, 'SELECT "key", "data" FROM "StorageBlobs" WHERE "key" = $1');
 });
 
 test('isConnectionError matches transport failures only', () => {
