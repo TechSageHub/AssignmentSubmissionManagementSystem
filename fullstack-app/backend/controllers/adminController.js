@@ -13,7 +13,10 @@ async function getUsers(req, res, next) {
 
 async function getUser(req, res, next) {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid user ID' });
+    }
     const user = await userModel.findById(id);
     if (!user) {
       return res.status(404).json({ error: 'NotFound', details: 'User not found' });
@@ -26,7 +29,10 @@ async function getUser(req, res, next) {
 
 async function updateUserRole(req, res, next) {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid user ID' });
+    }
     const { role } = req.body;
     if (!['student', 'lecturer', 'admin'].includes(role)) {
       return res.status(400).json({ error: 'ValidationError', details: 'Role must be student, lecturer, or admin' });
@@ -35,8 +41,8 @@ async function updateUserRole(req, res, next) {
     if (!user) {
       return res.status(404).json({ error: 'NotFound', details: 'User not found' });
     }
-    await userModel.updateRole(Number(id), role);
-    auditLog.log(req, 'update_role', 'user', Number(id), { newRole: role });
+    await userModel.updateRole(id, role);
+    auditLog.log(req, 'update_role', 'user', id, { newRole: role });
     res.json({ message: 'User role updated successfully' });
   } catch (err) {
     next(err);
@@ -45,14 +51,17 @@ async function updateUserRole(req, res, next) {
 
 async function toggleUserStatus(req, res, next) {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid user ID' });
+    }
     const user = await userModel.findById(id);
     if (!user) {
       return res.status(404).json({ error: 'NotFound', details: 'User not found' });
     }
     const newStatus = !user.is_active;
-    await userModel.setActiveStatus(Number(id), newStatus);
-    auditLog.log(req, newStatus ? 'activate_user' : 'suspend_user', 'user', Number(id));
+    await userModel.setActiveStatus(id, newStatus);
+    auditLog.log(req, newStatus ? 'activate_user' : 'suspend_user', 'user', id);
     res.json({ message: `User ${newStatus ? 'activated' : 'suspended'} successfully` });
   } catch (err) {
     next(err);
@@ -78,8 +87,14 @@ async function importUsers(req, res, next) {
         await provisionUser(row, req.user.role);
         created++;
       } catch (err) {
-        const reason = err && err.details ? err.details : (err.message || 'Unknown error');
-        errors.push({ row: i + 1, email: users[i]?.email || null, reason });
+        // Only surface controlled validation details from provisionUser; never
+        // leak raw driver/internal messages to the client. Log them server-side.
+        if (err && err.status && err.details) {
+          errors.push({ row: i + 1, email: users[i]?.email || null, reason: err.details });
+        } else {
+          console.error(`importUsers: unexpected error creating row ${i + 1}:`, err);
+          errors.push({ row: i + 1, email: users[i]?.email || null, reason: 'Unexpected error' });
+        }
       }
     }
 

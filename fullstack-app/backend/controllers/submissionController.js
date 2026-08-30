@@ -7,7 +7,7 @@ const groupMemberModel = require('../models/groupMember');
 const userModel = require('../models/user');
 const { sendSubmissionConfirmation } = require('../utils/emailHelper');
 const { notifySubmissionConfirmed } = require('../utils/notificationHelper');
-const { assertSubmissionAssignmentOwner } = require('../utils/authorization');
+const { assertSubmissionReadAccess } = require('../utils/authorization');
 const { parseInputDate, toIsoUtc } = require('../utils/dates');
 const { withTransaction, isDuplicateKeyError } = require('../config/db');
 
@@ -203,23 +203,15 @@ async function getSubmission(req, res, next) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Submission not found' });
     }
 
-    if (req.user.role === 'student') {
-      // Check if student is the owner or a group member
-      if (submission.student_id !== req.user.id) {
-        const members = await groupMemberModel.findBySubmission(submission.id);
-        const isMember = members.some(m => m.user_id === req.user.id);
-        if (!isMember) {
-          return res.status(403).json({ error: 'AuthorizationError', details: 'Not your submission' });
-        }
-      }
-    } else if (req.user.role === 'lecturer') {
-      const ownership = await assertSubmissionAssignmentOwner(req.user.id, submission);
-      if (!ownership.ok) {
-        return res.status(ownership.status).json({ error: 'AuthorizationError', details: ownership.message });
-      }
+    const members = await groupMemberModel.findBySubmission(submission.id);
+    const isGroupMember = submission.student_id !== req.user.id
+      ? members.some(m => m.user_id === req.user.id)
+      : false;
+    const access = await assertSubmissionReadAccess(req.user, submission, isGroupMember);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: 'AuthorizationError', details: access.message });
     }
 
-    const members = await groupMemberModel.findBySubmission(submission.id);
     const files = await submissionFileModel.findBySubmission(submission.id);
     submission.group_members = members;
     submission.files = files;
@@ -232,23 +224,22 @@ async function getSubmission(req, res, next) {
 
 async function getSubmissionFile(req, res, next) {
   try {
-    const submission = await submissionModel.findById(req.params.submissionId);
+    const submissionId = parseInt(req.params.submissionId, 10);
+    if (isNaN(submissionId)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid submission ID' });
+    }
+
+    const submission = await submissionModel.findById(submissionId);
     if (!submission) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Submission not found' });
     }
 
-    // Authorization
-    if (req.user.role === 'student' && submission.student_id !== req.user.id) {
-      const members = await groupMemberModel.findBySubmission(submission.id);
-      const isMember = members.some(m => m.user_id === req.user.id);
-      if (!isMember) {
-        return res.status(403).json({ error: 'AuthorizationError', details: 'Not your submission' });
-      }
-    } else if (req.user.role === 'lecturer') {
-      const assignment = await assignmentModel.findById(submission.assignment_id);
-      if (!assignment || assignment.lecturer_id !== req.user.id) {
-        return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
-      }
+    const isGroupMember = submission.student_id !== req.user.id
+      ? (await groupMemberModel.findBySubmission(submission.id)).some(m => m.user_id === req.user.id)
+      : false;
+    const access = await assertSubmissionReadAccess(req.user, submission, isGroupMember);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: 'AuthorizationError', details: access.message });
     }
 
     const fileId = parseInt(req.query.fileId, 10);

@@ -78,7 +78,11 @@ async function getAssignments(req, res, next) {
 
 async function getAssignment(req, res, next) {
   try {
-    const assignment = await assignmentModel.findById(req.params.id);
+    const assignmentId = parseInt(req.params.id, 10);
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid assignment ID' });
+    }
+    const assignment = await assignmentModel.findById(assignmentId);
     if (!assignment) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Assignment not found' });
     }
@@ -90,7 +94,11 @@ async function getAssignment(req, res, next) {
 
 async function updateAssignment(req, res, next) {
   try {
-    const assignment = await assignmentModel.findById(req.params.id);
+    const assignmentId = parseInt(req.params.id, 10);
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid assignment ID' });
+    }
+    const assignment = await assignmentModel.findById(assignmentId);
     if (!assignment) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Assignment not found' });
     }
@@ -119,7 +127,7 @@ async function updateAssignment(req, res, next) {
       dueDate = toStoredUtc(assignment.due_date);
     }
 
-    const updated = await assignmentModel.update(req.params.id, {
+    const updated = await assignmentModel.update(assignmentId, {
       title: title.trim(),
       description: description || null,
       dueDate,
@@ -135,7 +143,11 @@ async function updateAssignment(req, res, next) {
 
 async function deleteAssignment(req, res, next) {
   try {
-    const assignment = await assignmentModel.findById(req.params.id);
+    const assignmentId = parseInt(req.params.id, 10);
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid assignment ID' });
+    }
+    const assignment = await assignmentModel.findById(assignmentId);
     if (!assignment) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Assignment not found' });
     }
@@ -143,8 +155,8 @@ async function deleteAssignment(req, res, next) {
       return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
     }
 
-    await assignmentModel.remove(req.params.id);
-    auditLog.log(req, 'delete', 'assignment', Number(req.params.id), { title: assignment.title });
+    await assignmentModel.remove(assignmentId);
+    auditLog.log(req, 'delete', 'assignment', assignmentId, { title: assignment.title });
     res.status(204).end();
   } catch (err) {
     next(err);

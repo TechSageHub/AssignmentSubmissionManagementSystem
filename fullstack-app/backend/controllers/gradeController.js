@@ -6,7 +6,7 @@ const userModel = require('../models/user');
 const { sendGradeReleased } = require('../utils/emailHelper');
 const { notifyGradeReleased } = require('../utils/notificationHelper');
 const auditLog = require('../utils/auditLogger');
-const { assertSubmissionAssignmentOwner } = require('../utils/authorization');
+const { assertSubmissionAssignmentOwner, assertSubmissionReadAccess } = require('../utils/authorization');
 
 async function gradeSubmission(req, res, next) {
   try {
@@ -148,17 +148,12 @@ async function getGrade(req, res, next) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Submission not found' });
     }
 
-    if (req.user.role === 'lecturer') {
-      const ownership = await assertSubmissionAssignmentOwner(req.user.id, submission);
-      if (!ownership.ok) {
-        return res.status(ownership.status).json({ error: 'AuthorizationError', details: ownership.message });
-      }
-    } else if (req.user.role === 'student') {
-      const isOwner = submission.student_id === req.user.id;
-      const isGroupMember = await groupMemberModel.isMember(submissionId, req.user.id);
-      if (!isOwner && !isGroupMember) {
-        return res.status(403).json({ error: 'AuthorizationError', details: 'Not your submission' });
-      }
+    const isGroupMember = req.user.role === 'student'
+      ? await groupMemberModel.isMember(submissionId, req.user.id)
+      : false;
+    const access = await assertSubmissionReadAccess(req.user, submission, isGroupMember);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: 'AuthorizationError', details: access.message });
     }
 
     const grade = await gradeModel.findBySubmission(submissionId);

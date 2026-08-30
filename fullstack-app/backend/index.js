@@ -7,6 +7,36 @@ const config = require('./config/env');
 const reminderService = require('./services/reminderService');
 const systemConfigModel = require('./models/systemConfig');
 
+// CORS: allow the configured frontend origins plus common dev ports. When no
+// origins are configured (fresh local dev), fall back to permissive, matching
+// the previous behaviour. Set CORS_ORIGINS (comma-separated) in production.
+function buildCorsOptions() {
+  const configured = (process.env.CORS_ORIGINS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const implicit = [
+    process.env.FRONTEND_URL,
+    process.env.NGROK_URL,
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:4173',
+  ].filter(Boolean);
+  const origins = [...new Set([...configured, ...implicit])];
+
+  if (origins.length === 0) {
+    console.warn('[cors] CORS_ORIGINS not configured; allowing all origins');
+    return null;
+  }
+
+  return {
+    origin(origin, cb) {
+      // Allow requests with no Origin header (curl, native clients).
+      if (!origin) return cb(null, true);
+      return cb(null, origins.includes(origin));
+    },
+  };
+}
+
 const app = express();
 
 if (process.env.RATE_LIMIT_TRUST_PROXY === 'true') {
@@ -14,7 +44,8 @@ if (process.env.RATE_LIMIT_TRUST_PROXY === 'true') {
 }
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors());
+const corsOptions = buildCorsOptions();
+app.use(corsOptions ? cors(corsOptions) : cors());
 app.use(express.json());
 
 // Uploaded files are NEVER served statically. They are only streamed through the
@@ -63,11 +94,18 @@ app.use((_req, res) => {
 // Global error handler
 app.use((err, req, res, _next) => {
   console.error(err);
-  const status = err.status || 500;
+
+  const status = Number.isInteger(err && err.status) && err.status >= 400 && err.status < 600
+    ? err.status
+    : 500;
   const exposeDetails = status < 500 || process.env.NODE_ENV !== 'production';
+  const message = exposeDetails
+    ? String((err && err.message) || 'An unexpected error occurred').slice(0, 500)
+    : 'An unexpected error occurred. Please try again later.';
+
   res.status(status).json({
-    error: err.name || 'InternalServerError',
-    details: exposeDetails ? (err.message || 'An unexpected error occurred') : 'An unexpected error occurred. Please try again later.',
+    error: String((err && err.name) || 'InternalServerError').slice(0, 100),
+    details: message,
   });
 });
 

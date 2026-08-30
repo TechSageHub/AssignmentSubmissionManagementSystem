@@ -4,6 +4,9 @@ const rubricModel = require('../models/rubric');
 async function getRubric(req, res, next) {
   try {
     const assignmentId = parseInt(req.params.id, 10);
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid assignment ID' });
+    }
     const criteria = await rubricModel.findByAssignment(assignmentId);
     res.json(criteria);
   } catch (err) {
@@ -14,6 +17,9 @@ async function getRubric(req, res, next) {
 async function saveRubric(req, res, next) {
   try {
     const assignmentId = parseInt(req.params.id, 10);
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Invalid assignment ID' });
+    }
     const assignment = await assignmentModel.findById(assignmentId);
     if (!assignment) {
       return res.status(404).json({ error: 'NotFound', details: 'Assignment not found' });
