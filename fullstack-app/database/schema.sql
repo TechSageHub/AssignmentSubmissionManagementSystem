@@ -268,6 +268,19 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ReminderLog_student_id
     CREATE INDEX IX_ReminderLog_student_id ON ReminderLog(student_id);
 GO
 
+-- ================= StorageBlobs =================
+IF OBJECT_ID('dbo.StorageBlobs', 'U') IS NULL
+BEGIN
+    CREATE TABLE StorageBlobs (
+        [key] VARCHAR(500) PRIMARY KEY,
+        [content_type] VARCHAR(255) NULL,
+        [file_size] INT NOT NULL DEFAULT 0,
+        [data] VARBINARY(MAX) NOT NULL,
+        [created_at] DATETIME2 DEFAULT GETDATE()
+    );
+END
+GO
+
 -- ================= SystemConfig =================
 IF OBJECT_ID('dbo.SystemConfig', 'U') IS NULL
 BEGIN

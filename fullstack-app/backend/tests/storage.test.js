@@ -9,8 +9,16 @@ process.env.UPLOAD_PATH = path.join(tmpDir, 'uploads');
 
 const storage = require('../services/storage');
 
-test.after(() => {
+test.after(async () => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
+  try {
+    const { getPool } = require('../config/db');
+    const pool = await getPool();
+    if (pool) {
+      if (pool.close) await pool.close();
+      if (pool.end) await pool.end();
+    }
+  } catch { /* ignore cleanup error */ }
 });
 
 test('toKey normalizes windows separators and strips the uploads prefix', () => {

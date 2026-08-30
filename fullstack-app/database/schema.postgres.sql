@@ -148,6 +148,14 @@ CREATE TABLE IF NOT EXISTS ReminderLog (
 CREATE INDEX IF NOT EXISTS IX_ReminderLog_assignment_id ON ReminderLog(assignment_id);
 CREATE INDEX IF NOT EXISTS IX_ReminderLog_student_id ON ReminderLog(student_id);
 
+CREATE TABLE IF NOT EXISTS "StorageBlobs" (
+    "key" VARCHAR(500) PRIMARY KEY,
+    "content_type" VARCHAR(255) NULL,
+    "file_size" INT NOT NULL DEFAULT 0,
+    "data" BYTEA NOT NULL,
+    "created_at" TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS SystemConfig (
     key VARCHAR(100) PRIMARY KEY,
     value TEXT
@@ -165,3 +173,4 @@ INSERT INTO SystemConfig (key, value) VALUES
     ('about_objectives', '1. Provide a secure and standardized channel for assignment submission\n2. Enable lecturers to create, manage, and grade assignments efficiently\n3. Give students real-time access to grades and feedback\n4. Automate deadline enforcement and late submission detection\n5. Maintain organized records of all submissions and grades'),
     ('about_benefits', 'Students can submit assignments from anywhere, track deadlines, and view grades instantly. Lecturers save time with streamlined grading and automated notifications. The institution benefits from organized digital records and reduced administrative overhead.')
 ON CONFLICT (key) DO NOTHING;
+

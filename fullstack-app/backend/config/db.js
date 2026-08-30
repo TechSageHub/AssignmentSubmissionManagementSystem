@@ -45,6 +45,7 @@ function startKeepAlive() {
       pool = null;
     }
   }, 60000);
+  if (keepAliveTimer.unref) keepAliveTimer.unref();
 }
 
 function getParamId(key, paramMap, paramIndex) {

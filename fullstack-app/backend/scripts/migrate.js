@@ -16,6 +16,7 @@ const migrations = dbType === 'postgres'
       'migration_009_add_reminder_log.postgres.sql',
       'migration_010_add_gradecriteria_unique.postgres.sql',
       'migration_011_submissions_unique_fk.postgres.sql',
+      'migration_012_add_storage_blobs.postgres.sql',
     ]
   : [
       'migration_001_add_verification.sql',
@@ -29,6 +30,7 @@ const migrations = dbType === 'postgres'
       'migration_009_add_reminder_log.sql',
       'migration_010_add_gradecriteria_unique.sql',
       'migration_011_submissions_unique_fk.sql',
+      'migration_012_add_storage_blobs.sql',
     ];
 
 function splitStatements(sql) {

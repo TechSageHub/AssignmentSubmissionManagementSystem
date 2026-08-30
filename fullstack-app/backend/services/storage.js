@@ -1,13 +1,13 @@
-// Upload storage abstraction. Production (Vercel) stores files in an
-// S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, ...). Local dev without
-// S3 credentials falls back to the old on-disk uploads directory, so the
-// behaviour is identical either way.
-//
-// DB rows keep a `file_path` of the form "uploads/assignments/<id>/<file>".
-// For S3 the leading "uploads/" is dropped and the rest becomes the object key.
+// Upload storage abstraction.
+// 1. If S3_BUCKET is configured: stores/retrieves files in S3-compatible object storage.
+// 2. If S3_BUCKET is NOT configured: stores files in the database (StorageBlobs table)
+//    and dual-writes to the local uploads directory when available. Reads transparently
+//    fall back from disk to the database blob binary stream.
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 const config = require('../config/env');
+const storageBlobModel = require('../models/storageBlob');
 
 const uploadDir = path.resolve(__dirname, '..', config.uploadPath);
 
@@ -66,13 +66,19 @@ async function storeFile({ filePath, buffer, contentType }) {
     return;
   }
 
-  const abs = toDiskPath(filePath);
-  fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, buffer);
+  // Local disk write (best-effort for local dev)
+  try {
+    const abs = toDiskPath(filePath);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, buffer);
+  } catch { /* ignore ephemeral disk write errors on serverless */ }
+
+  // Database binary blob persistence (zero-credential fallback for serverless/Vercel)
+  await storageBlobModel.upsert(key, buffer, contentType);
 }
 
 // Returns true when the object exists; returns a number size when the caller
-// asks for it (disk stat / S3 HeadObject).
+// asks for it (disk stat / DB file_size / S3 HeadObject).
 async function exists(filePath, withSize = false) {
   const key = toKey(filePath);
   if (!key) return withSize ? null : false;
@@ -91,8 +97,16 @@ async function exists(filePath, withSize = false) {
   }
 
   const abs = toDiskPath(filePath);
-  if (!fs.existsSync(abs)) return withSize ? null : false;
-  return withSize ? fs.statSync(abs).size : true;
+  if (fs.existsSync(abs)) {
+    return withSize ? fs.statSync(abs).size : true;
+  }
+
+  const dbSize = await storageBlobModel.exists(key);
+  if (dbSize !== null) {
+    return withSize ? dbSize : true;
+  }
+
+  return withSize ? null : false;
 }
 
 async function createReadStream(filePath) {
@@ -106,8 +120,17 @@ async function createReadStream(filePath) {
   }
 
   const abs = toDiskPath(filePath);
-  if (!fs.existsSync(abs)) return null;
-  return fs.createReadStream(abs);
+  if (fs.existsSync(abs)) {
+    return fs.createReadStream(abs);
+  }
+
+  const blob = await storageBlobModel.findByKey(key);
+  if (blob && blob.data) {
+    const buffer = Buffer.isBuffer(blob.data) ? blob.data : Buffer.from(blob.data);
+    return Readable.from(buffer);
+  }
+
+  return null;
 }
 
 // Best-effort removal; never throws.
@@ -121,9 +144,14 @@ async function unlink(filePath) {
       await getS3Client().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }));
       return;
     }
+
+    await storageBlobModel.removeByKey(key);
+
     const abs = toDiskPath(filePath);
-    fs.rmSync(abs, { force: true });
-    fs.rmSync(path.dirname(abs), { recursive: true });
+    if (fs.existsSync(abs)) {
+      fs.rmSync(abs, { force: true });
+      try { fs.rmSync(path.dirname(abs), { recursive: true }); } catch { /* ignore */ }
+    }
   } catch { /* ignore */ }
 }
 
