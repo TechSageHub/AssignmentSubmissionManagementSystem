@@ -51,11 +51,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       return () => window.clearTimeout(timer)
     }, [pending, pendingDelayMs])
 
-    const Comp = asChild ? Slot : "button"
+    if (asChild) {
+      return (
+        <Slot
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref as any}
+          {...props}
+        >
+          {children}
+        </Slot>
+      )
+    }
+
     const isPending = pending && showPending
 
     return (
-      <Comp
+      <button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || isPending}
@@ -68,7 +79,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           </svg>
         )}
         {children}
-      </Comp>
+      </button>
     )
   }
 )

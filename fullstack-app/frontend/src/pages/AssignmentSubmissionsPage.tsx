@@ -150,12 +150,12 @@ export default function AssignmentSubmissionsPage() {
 
   return (
     <Layout>
-      <Button variant="ghost" size="sm" className="mb-4 gap-2" asChild>
-        <Link to={`/assignments/${id}`}>
+      <Link to={`/assignments/${id}`}>
+        <Button variant="ghost" size="sm" className="mb-4 gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back to Assignment
-        </Link>
-      </Button>
+        </Button>
+      </Link>
 
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
