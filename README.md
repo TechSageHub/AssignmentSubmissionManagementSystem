@@ -84,6 +84,18 @@ cd ../frontend
 npm run dev
 ```
 
+### Running Tests
+
+```bash
+# Backend unit tests (Node builtin test runner) — run from the backend dir
+cd fullstack-app/backend
+node --test
+
+# Frontend tests (Vitest)
+cd fullstack-app/frontend
+npm test
+```
+
 ### Database Options
 
 The app supports two database backends controlled by the `DB_TYPE` environment variable:

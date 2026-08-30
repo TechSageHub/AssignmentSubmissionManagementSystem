@@ -15,6 +15,8 @@ cd fullstack-app/frontend && npm run dev
 cd fullstack-app/backend && npm run migrate
 # tests: Node builtin runner, from backend dir (npm test is a stub that errors)
 cd fullstack-app/backend && node --test
+# frontend tests: vitest (api cache layer), from frontend dir
+cd fullstack-app/frontend && npm test
 # build frontend (backend serves frontend/dist as SPA in prod)
 cd fullstack-app/frontend && npm run build
 ```
