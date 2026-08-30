@@ -133,6 +133,27 @@ async function findAll() {
   return result.recordset;
 }
 
+async function findAllPaginated({ search, limit = 50, offset = 0 }) {
+  const params = { limit, offset };
+  const where = [];
+  if (search) {
+    where.push('(name LIKE @search OR email LIKE @search)');
+    params.search = `%${search}%`;
+  }
+  const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+  const countResult = await query(`SELECT COUNT(*) AS count FROM Users ${whereSql}`, params);
+  const result = await query(
+    `SELECT id, name, email, role, is_verified, is_active, created_at
+     FROM Users
+     ${whereSql}
+     ORDER BY created_at DESC, id DESC
+     OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
+    params
+  );
+  return { items: result.recordset, total: Number(countResult.recordset[0].count) };
+}
+
 async function updateRole(id, role) {
   await query('UPDATE Users SET role = @role WHERE id = @id', { id, role });
 }
@@ -216,4 +237,4 @@ async function updateProfile(id, { department, programme, level, phone }) {
   return result.recordset[0] || null;
 }
 
-module.exports = { buildUserFindByIdQuery, isMissingColumnError, findByEmail, findByUsername, findByEmailOrUsername, findById, createUser, findByVerificationToken, verifyUser, setVerificationToken, findAll, updateRole, setActiveStatus, getStats, findAllStudents, findStudentsByIds, findByIdWithEmail, updatePassword, updateProfile };
+module.exports = { buildUserFindByIdQuery, isMissingColumnError, findByEmail, findByUsername, findByEmailOrUsername, findById, createUser, findByVerificationToken, verifyUser, setVerificationToken, findAll, findAllPaginated, updateRole, setActiveStatus, getStats, findAllStudents, findStudentsByIds, findByIdWithEmail, updatePassword, updateProfile };

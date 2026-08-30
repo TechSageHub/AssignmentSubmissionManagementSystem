@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Download, Upload, UserPlus, RefreshCw } from 'lucide-react'
+import { Download, Upload, UserPlus, RefreshCw, Search } from 'lucide-react'
 
 interface AdminUser {
   id: number
@@ -19,27 +20,56 @@ interface AdminUser {
   created_at: string
 }
 
+interface UserPageResponse {
+  items: AdminUser[]
+  total: number
+  limit: number
+  offset: number
+}
+
 const TEMPLATE_HEADERS = ['name', 'email', 'password', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
+const PAGE_SIZE = 20
+
+function buildPageNumbers(current: number, last: number): (number | '...')[] {
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1)
+  const result: (number | '...')[] = [1]
+  const start = Math.max(2, current - 1)
+  const end = Math.min(last - 1, current + 1)
+  if (start > 2) result.push('...')
+  for (let p = start; p <= end; p++) result.push(p)
+  if (end < last - 1) result.push('...')
+  result.push(last)
+  return result
+}
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [refreshKey, setRefreshKey] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const fetchUsers = async (showLoading = true) => {
-    const cachedUsers = readApiCache<AdminUser[]>('/admin/users')
-    if (cachedUsers) {
-      setUsers(cachedUsers)
+  const cacheKey = `/admin/users?limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}${search ? `&search=${encodeURIComponent(search)}` : ''}`
+
+  const fetchUsers = async (useCache = true) => {
+    const cached = useCache ? readApiCache<UserPageResponse>(cacheKey) : null
+    if (cached) {
+      setUsers(cached.items)
+      setTotal(cached.total)
       setLoading(false)
-    } else if (showLoading) {
+    } else {
       setLoading(true)
     }
 
     try {
-      const { data } = await api.get('/admin/users')
-      setUsers(data)
+      const { data } = await api.get(cacheKey)
+      setUsers(data.items)
+      setTotal(data.total)
     } catch (err) {
       console.error(err)
       toast.error('Unable to load users')
@@ -49,8 +79,19 @@ export default function UserManagementPage() {
   }
 
   useEffect(() => {
-    fetchUsers(false)
-  }, [])
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search])
+
+  useEffect(() => {
+    fetchUsers(true)
+  }, [cacheKey, refreshKey])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const downloadTemplate = () => {
     const sampleRow = [
@@ -118,7 +159,7 @@ export default function UserManagementPage() {
       if (data.errors?.length) {
         toast.message(`Skipped rows: ${data.errors.map((error: { row: number; reason: string }) => `#${error.row} (${error.reason})`).slice(0, 5).join(', ')}`)
       }
-      fetchUsers(true)
+      setRefreshKey((k) => k + 1)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { details?: string } } })?.response?.data?.details
       toast.error(msg || 'Import failed')
@@ -147,7 +188,7 @@ export default function UserManagementPage() {
             <Upload className={`mr-2 h-4 w-4 ${importing ? 'animate-pulse' : ''}`} />
             {importing ? 'Importing...' : 'Bulk Upload CSV'}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => fetchUsers(true)} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -166,7 +207,7 @@ export default function UserManagementPage() {
         open={showCreate}
         onOpenChange={setShowCreate}
         allowedRoles={['student', 'lecturer', 'admin']}
-        onCreated={() => fetchUsers(false)}
+        onCreated={() => setRefreshKey((k) => k + 1)}
       />
 
       <Card className="mb-8">
@@ -190,13 +231,24 @@ export default function UserManagementPage() {
       </Card>
 
       <Card className="mb-8">
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>All users</CardTitle>
             <p className="text-sm text-muted-foreground">Manage the full list of users created in the system.</p>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {users.length} users found
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search by name or email..."
+                className="w-full pl-8 sm:w-64"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground whitespace-nowrap">
+              {total} user{total === 1 ? '' : 's'} found
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -215,21 +267,66 @@ export default function UserManagementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((userItem) => (
-                    <tr key={userItem.id} className="border-b last:border-0">
-                      <td className="py-3 font-medium">{userItem.name}</td>
-                      <td className="py-3 text-muted-foreground">{userItem.email}</td>
-                      <td className="py-3">{userItem.role}</td>
-                      <td className="py-3">
-                        <Badge variant="outline" className={userItem.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}>
-                          {userItem.is_active ? 'Active' : 'Suspended'}
-                        </Badge>
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                        {search ? 'No users match your search.' : 'No users have been created yet.'}
                       </td>
-                      <td className="py-3 text-muted-foreground text-xs">{new Date(userItem.created_at).toLocaleDateString()}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    users.map((userItem) => (
+                      <tr key={userItem.id} className="border-b last:border-0">
+                        <td className="py-3 font-medium">{userItem.name}</td>
+                        <td className="py-3 text-muted-foreground">{userItem.email}</td>
+                        <td className="py-3">{userItem.role}</td>
+                        <td className="py-3">
+                          <Badge variant="outline" className={userItem.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}>
+                            {userItem.is_active ? 'Active' : 'Suspended'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 text-muted-foreground text-xs">{new Date(userItem.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
+              {!loading && totalPages > 1 && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {buildPageNumbers(page, totalPages).map((p, i) =>
+                      p === '...' ? (
+                        <span key={`gap-${i}`} className="px-1 text-sm text-muted-foreground">...</span>
+                      ) : (
+                        <Button
+                          key={p}
+                          variant={p === page ? 'default' : 'outline'}
+                          size="sm"
+                          className="min-w-9"
+                          onClick={() => setPage(p)}
+                        >
+                          {p}
+                        </Button>
+                      ),
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

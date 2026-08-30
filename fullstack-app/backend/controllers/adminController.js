@@ -4,8 +4,11 @@ const { provisionUser } = require('./userController');
 
 async function getUsers(req, res, next) {
   try {
-    const users = await userModel.findAll();
-    res.json(users);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const result = await userModel.findAllPaginated({ search, limit, offset });
+    res.json({ ...result, limit, offset });
   } catch (err) {
     next(err);
   }

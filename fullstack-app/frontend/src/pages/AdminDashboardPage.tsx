@@ -46,6 +46,8 @@ interface AuditEntry {
   created_at: string
 }
 
+const RECENT_USERS_KEY = '/admin/users?limit=5'
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
   const [stats, setStats] = useState<SystemStats | null>(null)
@@ -58,11 +60,11 @@ export default function AdminDashboardPage() {
 
   const fetchData = async (showLoading = true) => {
     const cachedStats = readApiCache<SystemStats>('/admin/stats')
-    const cachedUsers = readApiCache<AdminUser[]>('/admin/users')
-    const hasCachedData = Boolean(cachedStats) || Boolean(cachedUsers)
+    const cachedUsers = readApiCache<{ items: AdminUser[]; total: number }>(RECENT_USERS_KEY)
+    const hasCachedData = Boolean(cachedStats) || Boolean(cachedUsers?.items?.length)
 
     if (cachedStats) setStats(cachedStats)
-    if (cachedUsers) setUsers(cachedUsers)
+    if (cachedUsers) setUsers(cachedUsers.items)
     if (hasCachedData) {
       setLoading(false)
     } else if (showLoading) {
@@ -72,10 +74,10 @@ export default function AdminDashboardPage() {
     try {
       const [statsRes, usersRes] = await Promise.all([
         api.get('/admin/stats'),
-        api.get('/admin/users'),
+        api.get(RECENT_USERS_KEY),
       ])
       setStats(statsRes.data)
-      setUsers(usersRes.data)
+      setUsers(usersRes.data.items)
     } catch { /* ignore */ } finally {
       setLoading(false)
     }
