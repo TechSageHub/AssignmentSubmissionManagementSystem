@@ -19,26 +19,20 @@ export default defineConfig({
     },
   },
   build: {
-    rolldownOptions: {
+    rollupOptions: {
       output: {
-        codeSplitting: {
-          groups: [
-            {
-              name: 'react-vendor',
-              test: /node_modules[\\/](react|react-dom|react-router|scheduler)/,
-              priority: 20,
-            },
-            {
-              name: 'recharts',
-              test: /node_modules[\\/](recharts|d3-|victory-vendor)/,
-              priority: 10,
-            },
-            {
-              name: 'ui-vendor',
-              test: /node_modules[\\/](@radix-ui|sonner|class-variance-authority|clsx|tailwind-merge|axios)/,
-              priority: 10,
-            },
-          ],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') || id.includes('scheduler')) {
+              return 'react-vendor'
+            }
+            if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) {
+              return 'recharts'
+            }
+            if (id.includes('@radix-ui') || id.includes('sonner') || id.includes('class-variance-authority') || id.includes('clsx') || id.includes('tailwind-merge') || id.includes('axios')) {
+              return 'ui-vendor'
+            }
+          }
         },
       },
     },

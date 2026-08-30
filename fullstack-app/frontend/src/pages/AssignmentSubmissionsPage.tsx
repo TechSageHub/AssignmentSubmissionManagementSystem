@@ -79,8 +79,8 @@ export default function AssignmentSubmissionsPage() {
         api.get(`/assignments/${id}/submissions`),
         api.get(`/assignments/${id}/analytics`).catch(() => ({ data: null })),
       ])
-      setRows(subRes.data)
-      setAnalytics(anaRes.data)
+      setRows(Array.isArray(subRes.data) ? subRes.data : [])
+      setAnalytics(anaRes.data && Array.isArray(anaRes.data.distribution) ? anaRes.data : null)
       setSelectedIds([])
     } catch {
       setError(true)
@@ -102,8 +102,9 @@ export default function AssignmentSubmissionsPage() {
     )
   }
 
-  const ungraded = rows.filter((r) => r.score == null)
-  const filteredRows = rows.filter((r) => statusFilter === 'all' ? true : statusFilter === 'graded' ? r.score != null : r.score == null)
+  const safeRows = Array.isArray(rows) ? rows : []
+  const ungraded = safeRows.filter((r) => r && r.score == null)
+  const filteredRows = safeRows.filter((r) => r ? (statusFilter === 'all' ? true : statusFilter === 'graded' ? r.score != null : r.score == null) : false)
 
   const toggleSelection = (submissionId: number) => {
     setSelectedIds((prev) => prev.includes(submissionId) ? prev.filter((id) => id !== submissionId) : [...prev, submissionId])

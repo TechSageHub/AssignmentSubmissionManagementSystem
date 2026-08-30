@@ -4,6 +4,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import { useAuth } from '@/hooks/useAuth'
 import { ProtectedRoute, LecturerRoute, AdminRoute } from '@/components/ProtectedRoute'
 import { Toaster } from '@/components/ui/toaster'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import FullPageSpinner from '@/components/FullPageSpinner'
 import HomePage from '@/pages/HomePage'
 
@@ -99,12 +100,14 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
-      <Toaster />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+        <Toaster />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 
