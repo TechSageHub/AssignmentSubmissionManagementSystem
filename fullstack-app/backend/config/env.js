@@ -50,4 +50,12 @@ module.exports = {
   },
   jwtSecret: process.env.JWT_SECRET,
   uploadPath: process.env.UPLOAD_PATH || 'uploads',
+  storage: {
+    s3: {
+      bucket: process.env.S3_BUCKET || null,
+      region: process.env.S3_REGION || 'us-east-1',
+      endpoint: process.env.S3_ENDPOINT || null,
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+    },
+  },
 };

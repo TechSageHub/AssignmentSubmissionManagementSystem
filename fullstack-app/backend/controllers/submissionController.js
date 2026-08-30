@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 const assignmentModel = require('../models/assignment');
 const submissionModel = require('../models/submission');
 const submissionFileModel = require('../models/submissionFile');
@@ -9,7 +8,17 @@ const { sendSubmissionConfirmation } = require('../utils/emailHelper');
 const { notifySubmissionConfirmed } = require('../utils/notificationHelper');
 const { assertSubmissionReadAccess } = require('../utils/authorization');
 const { parseInputDate, toIsoUtc } = require('../utils/dates');
+const storage = require('../services/storage');
 const { withTransaction, isDuplicateKeyError } = require('../config/db');
+
+function buildFilePaths(assignmentId, files) {
+  const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  return files.map((file, i) => {
+    const ext = path.extname(file.originalname);
+    const filename = `student_${uniqueSuffix}_${i}${ext}`;
+    return path.posix.join('uploads', 'assignments', String(assignmentId), filename);
+  });
+}
 
 async function submitAssignment(req, res, next) {
   try {
@@ -49,6 +58,23 @@ async function submitAssignment(req, res, next) {
       }
     }
 
+    const filePaths = buildFilePaths(assignmentId, req.files);
+
+    // Persist file bytes to storage BEFORE the DB transaction so a failed
+    // insert never leaves dangling DB rows. Clean up on any later failure.
+    try {
+      for (let i = 0; i < req.files.length; i++) {
+        await storage.storeFile({
+          filePath: filePaths[i],
+          buffer: req.files[i].buffer,
+          contentType: req.files[i].mimetype || null,
+        });
+      }
+    } catch (err) {
+      for (const fp of filePaths) await storage.unlink(fp);
+      throw err;
+    }
+
     let result;
     try {
       result = await withTransaction(async ({ exec }) => {
@@ -75,21 +101,22 @@ async function submitAssignment(req, res, next) {
           {
             assignmentId,
             studentId: req.user.id,
-            filePath: path.join('uploads', 'assignments', String(assignmentId), req.files[0].filename),
+            filePath: filePaths[0],
             originalName: req.files[0].originalname,
             isLate,
           }
         );
         const submission = created.recordset[0];
 
-        for (const file of req.files) {
+        for (let i = 0; i < req.files.length; i++) {
+          const file = req.files[i];
           await exec(
             `INSERT INTO SubmissionFiles (submission_id, file_path, original_name, file_size, mime_type)
              OUTPUT INSERTED.*
              VALUES (@submissionId, @filePath, @originalName, @fileSize, @mimeType)`,
             {
               submissionId: submission.id,
-              filePath: path.join('uploads', 'assignments', String(assignmentId), file.filename),
+              filePath: filePaths[i],
               originalName: file.originalname,
               fileSize: file.size ?? 0,
               mimeType: file.mimetype || null,
@@ -107,6 +134,8 @@ async function submitAssignment(req, res, next) {
         return { submission, orphanedFiles };
       });
     } catch (err) {
+      // Clean up the just-stored files (best effort) when the transaction rolls back.
+      for (const fp of filePaths) await storage.unlink(fp);
       // Concurrent duplicate: another request already created this student's submission.
       if (isDuplicateKeyError(err)) {
         return res.status(409).json({ error: 'ValidationError', details: 'You have already submitted this assignment' });
@@ -114,10 +143,9 @@ async function submitAssignment(req, res, next) {
       throw err;
     }
 
-    // Commit succeeded — remove the replaced submission's disk files (best effort).
+    // Commit succeeded — remove the replaced submission's stored files (best effort).
     for (const fp of result.orphanedFiles || []) {
-      const abs = path.resolve(__dirname, '..', fp);
-      try { fs.unlinkSync(abs); } catch { /* ignore */ }
+      await storage.unlink(fp);
     }
 
     const members = await groupMemberModel.findBySubmission(result.submission.id);
@@ -252,8 +280,8 @@ async function getSubmissionFile(req, res, next) {
     }
 
     const selectedFile = fileRecord || { file_path: submission.file_path, original_name: submission.original_name };
-    const filePath = path.resolve(__dirname, '..', selectedFile.file_path);
-    if (!fs.existsSync(filePath)) {
+    const size = await storage.exists(selectedFile.file_path, true);
+    if (size === null) {
       return res.status(404).json({ error: 'NotFoundError', details: 'File not found on server' });
     }
 
@@ -266,11 +294,19 @@ async function getSubmissionFile(req, res, next) {
     };
     const contentType = mimeMap[ext] || 'application/octet-stream';
 
+    const fileStream = await storage.createReadStream(selectedFile.file_path);
+    if (!fileStream) {
+      return res.status(404).json({ error: 'NotFoundError', details: 'File not found on server' });
+    }
+
     const safeName = String(selectedFile.original_name).replace(/["\\\r\n]/g, '_');
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
-    res.setHeader('Content-Length', fs.statSync(filePath).size);
-    fs.createReadStream(filePath).pipe(res);
+    if (size !== true) {
+      res.setHeader('Content-Length', size);
+    }
+    fileStream.on('error', () => res.destroy());
+    fileStream.pipe(res);
   } catch (err) {
     next(err);
   }

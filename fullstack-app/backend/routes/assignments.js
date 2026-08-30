@@ -1,7 +1,6 @@
 const { Router } = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/requireRole');
 const { uploadLimiter } = require('../middleware/rateLimit');
@@ -22,16 +21,19 @@ const { downloadAllSubmissions } = require('../controllers/downloadController');
 
 const router = Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.resolve(__dirname, '..', 'uploads', 'assignments', req.params.id);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `student_${req.user.id}_${uniqueSuffix}${ext}`);
+// Files are held in memory and pushed to storage (S3 in prod, disk in dev) by
+// the controller, never written to the server's filesystem by multer.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_UPLOAD_EXTENSIONS.has(ext)) {
+      const err = new Error(`File type "${ext || file.originalname}" is not allowed`);
+      err.status = 400;
+      return cb(err);
+    }
+    cb(null, true);
   },
 });
 
@@ -45,20 +47,6 @@ const ALLOWED_UPLOAD_EXTENSIONS = new Set([
   '.zip', '.rar', '.7z', '.tar', '.gz',
   '.json', '.xml',
 ]);
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_UPLOAD_EXTENSIONS.has(ext)) {
-      const err = new Error(`File type "${ext || file.originalname}" is not allowed`);
-      err.status = 400;
-      return cb(err);
-    }
-    cb(null, true);
-  },
-});
 
 router.use(authenticate);
 

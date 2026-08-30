@@ -1,8 +1,7 @@
-const path = require('path');
-const fs = require('fs');
 const archiver = require('archiver');
 const assignmentModel = require('../models/assignment');
 const submissionModel = require('../models/submission');
+const storage = require('../services/storage');
 
 async function downloadAllSubmissions(req, res, next) {
   try {
@@ -31,11 +30,11 @@ async function downloadAllSubmissions(req, res, next) {
     archive.pipe(res);
 
     for (const sub of submissions) {
-      const filePath = path.resolve(__dirname, '..', sub.file_path);
       try {
-        if (fs.existsSync(filePath)) {
+        const fileStream = await storage.createReadStream(sub.file_path);
+        if (fileStream) {
           const safeName = `${sub.student_name || 'student_' + sub.student_id}_${sub.original_name || 'file'}`;
-          archive.file(filePath, { name: safeName });
+          archive.append(fileStream, { name: safeName });
         }
       } catch { /* skip missing files */ }
     }
