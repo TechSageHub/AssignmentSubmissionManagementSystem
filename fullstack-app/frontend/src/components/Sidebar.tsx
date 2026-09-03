@@ -46,9 +46,8 @@ function timeAgo(dateStr: string) {
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'Just now'
   if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
+  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
+  const days = Math.floor(mins / 1440)
   if (days < 7) return `${days}d ago`
   return new Date(dateStr).toLocaleDateString()
 }
@@ -121,16 +120,88 @@ export default function Sidebar() {
     .toUpperCase()
     .slice(0, 2)
 
+  const notificationDropdown = (
+    notifOpen && (
+      <div className="absolute left-0 right-0 z-50 mx-3 mt-1 rounded-xl border bg-card shadow-xl animate-in fade-in-50 zoom-in-95">
+        <div className="flex items-center justify-between border-b px-3.5 py-2.5">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notifications</span>
+          {unreadCount > 0 && (
+            <button onClick={handleMarkAllRead} className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div className="max-h-80 overflow-y-auto divide-y divide-border/40">
+          {notifications.length === 0 ? (
+            <p className="px-3 py-6 text-center text-xs text-muted-foreground">No notifications yet</p>
+          ) : (
+            notifications.map((notif) => {
+              const Icon = notificationIcons[notif.type] || Bell
+              return (
+                <button
+                  key={notif.id}
+                  onClick={() => handleNotifClick(notif)}
+                  className={cn(
+                    "flex w-full gap-3 px-3.5 py-3 text-left text-sm transition-colors hover:bg-muted/50",
+                    !notif.is_read && "bg-primary/5"
+                  )}
+                >
+                  <div className={cn(
+                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+                    !notif.is_read ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                  )}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn("text-xs truncate", !notif.is_read ? "font-semibold text-foreground" : "text-muted-foreground")}>
+                      {notif.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">{timeAgo(notif.created_at)}</p>
+                  </div>
+                  {notif.link && (
+                    <ExternalLink className="mt-1 h-3 w-3 shrink-0 text-muted-foreground/40" />
+                  )}
+                </button>
+              )
+            })
+          )}
+        </div>
+      </div>
+    )
+  )
+
   const sidebarContent = (
     <div className="flex h-full flex-col">
-      <div className="flex h-14 items-center gap-2 px-6">
-        <img src="/fpi-logo.png" alt="FPI Logo" className="h-8 w-8 object-contain" />
-        <span className="font-semibold tracking-tight">FPI - ASMS</span>
+      <div className="flex h-14 items-center justify-between px-6">
+        <Link to="/dashboard" className="flex items-center gap-2">
+          <img src="/fpi-logo.png" alt="FPI Logo" className="h-8 w-8 object-contain" />
+          <span className="font-semibold tracking-tight">FPI - ASMS</span>
+        </Link>
       </div>
 
       <Separator />
 
       <nav className="flex-1 space-y-1 px-3 py-4">
+        {/* Notifications button moved to the top of the sidebar navigation */}
+        <div className="relative mb-2" ref={notifRef}>
+          <button
+            onClick={() => setNotifOpen(!notifOpen)}
+            className="relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:bg-muted/50 hover:text-foreground"
+          >
+            {unreadCount > 0 ? <BellRing className="h-4 w-4 text-primary" /> : <Bell className="h-4 w-4" />}
+            <span>Notifications</span>
+            {unreadCount > 0 && (
+              <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          {notificationDropdown}
+        </div>
+
+        <Separator className="my-2" />
+
         {navItems
           .filter((item) => item.roles.includes(user?.role || ''))
           .map((item) => {
@@ -155,70 +226,6 @@ export default function Sidebar() {
             )
           })}
       </nav>
-
-      <div className="px-3 py-2" ref={notifRef}>
-        <button
-          onClick={() => setNotifOpen(!notifOpen)}
-          className="relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:bg-muted/50 hover:text-foreground"
-        >
-          {unreadCount > 0 ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-          <span>Notifications</span>
-          {unreadCount > 0 && (
-            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
-
-        {notifOpen && (
-          <div className="absolute left-0 right-0 z-50 mx-3 mt-1 rounded-lg border bg-card shadow-lg">
-            <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notifications</span>
-              {unreadCount > 0 && (
-                <button onClick={handleMarkAllRead} className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">
-                  Mark all read
-                </button>
-              )}
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {notifications.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-muted-foreground">No notifications yet</p>
-              ) : (
-                notifications.map((notif) => {
-                  const Icon = notificationIcons[notif.type] || Bell
-                  return (
-                    <button
-                      key={notif.id}
-                      onClick={() => handleNotifClick(notif)}
-                      className={cn(
-                        "flex w-full gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/50",
-                        !notif.is_read && "bg-primary/5"
-                      )}
-                    >
-                      <div className={cn(
-                        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-                        !notif.is_read ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                      )}>
-                        <Icon className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-xs truncate", !notif.is_read ? "font-semibold text-foreground" : "text-muted-foreground")}>
-                          {notif.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">{notif.message}</p>
-                        <p className="text-[10px] text-muted-foreground/60 mt-0.5">{timeAgo(notif.created_at)}</p>
-                      </div>
-                      {notif.link && (
-                        <ExternalLink className="mt-1 h-3 w-3 shrink-0 text-muted-foreground/40" />
-                      )}
-                    </button>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        )}
-      </div>
 
       <Separator />
 
@@ -245,13 +252,28 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile trigger */}
-      <div className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-card px-4 lg:hidden">
-        <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
-          <Menu className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <img src="/fpi-logo.png" alt="FPI Logo" className="h-7 w-7 object-contain" />
-          <span className="font-semibold text-sm">FPI - ASMS</span>
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-card px-4 lg:hidden">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <img src="/fpi-logo.png" alt="FPI Logo" className="h-7 w-7 object-contain" />
+            <span className="font-semibold text-sm">FPI - ASMS</span>
+          </div>
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => setOpen(true)}
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50"
+          >
+            {unreadCount > 0 ? <BellRing className="h-5 w-5 text-primary" /> : <Bell className="h-5 w-5" />}
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
