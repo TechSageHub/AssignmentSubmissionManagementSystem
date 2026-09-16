@@ -10,7 +10,7 @@ const ALLOWED_ROLES = ['student', 'lecturer', 'admin'];
 // Shared provisioning logic used by the single-create endpoint and CSV import.
 // `creatorRole` enforces authorization (lecturers may only create students).
 // Returns the created user record. Throws { status, details } on validation failure.
-async function provisionUser({ name, email, password, role, username, studentId, staffId, department, programme, level, phone }, creatorRole) {
+async function provisionUser({ name, email, password, role, username, studentId, staffId, department, programme, level, phone, levelScope, level_scope }, creatorRole) {
   if (!name || !email || !password || !role) {
     throw { status: 400, details: 'Name, email, password and role are required' };
   }
@@ -44,6 +44,7 @@ async function provisionUser({ name, email, password, role, username, studentId,
     studentId: role === 'student' ? studentId : null,
     staffId: role === 'lecturer' ? staffId : null,
     department, programme, level, phone,
+    levelScope: role === 'lecturer' ? (levelScope || level_scope || null) : null,
     mustChangePassword: true,
   });
 
@@ -80,6 +81,10 @@ After verification, you will be asked to set your own password on first login.
 
 async function getStudents(req, res, next) {
   try {
+    if (req.user.role === 'lecturer' && req.user.department) {
+      const students = await userModel.findStudentsByDepartment(req.user.department, req.user.level_scope);
+      return res.json(students);
+    }
     const students = await userModel.findAllStudents();
     res.json(students);
   } catch (err) {
@@ -89,8 +94,14 @@ async function getStudents(req, res, next) {
 
 async function updateProfile(req, res, next) {
   try {
-    const { department, programme, level, phone } = req.body;
-    const user = await userModel.updateProfile(req.user.id, { department, programme, level, phone });
+    const { department, programme, level, phone, levelScope, level_scope } = req.body;
+    const user = await userModel.updateProfile(req.user.id, {
+      department,
+      programme,
+      level,
+      phone,
+      levelScope: levelScope || level_scope || null,
+    });
     if (!user) {
       return res.status(404).json({ error: 'NotFoundError', details: 'User not found' });
     }

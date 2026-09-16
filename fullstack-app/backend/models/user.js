@@ -1,13 +1,16 @@
 const { query } = require('../config/db');
 
-function buildUserFindByIdQuery(includeMustChangePassword = true) {
+function buildUserFindByIdQuery(includeMustChangePassword = true, includeLevelScope = true) {
   const columns = [
-    'id', 'name', 'email', 'username', 'role', 'is_verified', 'is_active', 'is_verified',
+    'id', 'name', 'email', 'username', 'role', 'is_verified', 'is_active',
     'student_id', 'staff_id', 'department', 'programme', 'level', 'phone'
   ];
 
   if (includeMustChangePassword) {
     columns.push('must_change_password');
+  }
+  if (includeLevelScope) {
+    columns.push('level_scope');
   }
 
   columns.push('created_at');
@@ -42,15 +45,23 @@ async function findByEmailOrUsername(login) {
 }
 
 async function findById(id) {
-  const attempts = [true, false];
+  const attempts = [
+    { includeMustChange: true, includeLevelScope: true },
+    { includeMustChange: true, includeLevelScope: false },
+    { includeMustChange: false, includeLevelScope: false },
+  ];
   let lastError;
 
-  for (const includeMustChangePassword of attempts) {
+  for (const { includeMustChange, includeLevelScope } of attempts) {
     try {
-      const result = await query(buildUserFindByIdQuery(includeMustChangePassword), { id });
+      const result = await query(buildUserFindByIdQuery(includeMustChange, includeLevelScope), { id });
       return result.recordset[0] || null;
     } catch (err) {
-      if (includeMustChangePassword && isMissingColumnError(err, 'must_change_password')) {
+      if (includeLevelScope && isMissingColumnError(err, 'level_scope')) {
+        lastError = err;
+        continue;
+      }
+      if (includeMustChange && isMissingColumnError(err, 'must_change_password')) {
         lastError = err;
         continue;
       }
@@ -67,7 +78,7 @@ function generateUsername(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.{2,}/g, '.').replace(/^\.|\.$/g, '');
 }
 
-async function createUser({ name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChangePassword = false }) {
+async function createUser({ name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChangePassword = false, levelScope = null }) {
   if (!username) {
     username = generateUsername(name);
     const existing = await findByUsername(username);
@@ -79,26 +90,50 @@ async function createUser({ name, email, passwordHash, role, username, studentId
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const mustChange = Boolean(mustChangePassword);
 
-  try {
-    const result = await query(
-      `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, must_change_password, verification_token, verification_token_expires)
-       OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.username, INSERTED.created_at, INSERTED.verification_token
-       VALUES (@name, @email, @passwordHash, @role, @username, @studentId, @staffId, @department, @programme, @level, @phone, @mustChange, @token, @expires)`,
-      { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChange, token, expires }
-    );
-    return result.recordset[0];
-  } catch (err) {
-    if (isMissingColumnError(err, 'must_change_password')) {
-      const fallbackResult = await query(
-        `INSERT INTO Users (name, email, password_hash, role, username, student_id, staff_id, department, programme, level, phone, verification_token, verification_token_expires)
+  const attempts = [
+    { includeMustChange: true, includeLevelScope: true },
+    { includeMustChange: true, includeLevelScope: false },
+    { includeMustChange: false, includeLevelScope: false },
+  ];
+  let lastError;
+
+  for (const { includeMustChange, includeLevelScope } of attempts) {
+    try {
+      const cols = ['name', 'email', 'password_hash', 'role', 'username', 'student_id', 'staff_id', 'department', 'programme', 'level', 'phone'];
+      const vals = ['@name', '@email', '@passwordHash', '@role', '@username', '@studentId', '@staffId', '@department', '@programme', '@level', '@phone'];
+
+      if (includeMustChange) {
+        cols.push('must_change_password');
+        vals.push('@mustChange');
+      }
+      if (includeLevelScope) {
+        cols.push('level_scope');
+        vals.push('@levelScope');
+      }
+      cols.push('verification_token', 'verification_token_expires');
+      vals.push('@token', '@expires');
+
+      const result = await query(
+        `INSERT INTO Users (${cols.join(', ')})
          OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.role, INSERTED.username, INSERTED.created_at, INSERTED.verification_token
-         VALUES (@name, @email, @passwordHash, @role, @username, @studentId, @staffId, @department, @programme, @level, @phone, @token, @expires)`,
-        { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, token, expires }
+         VALUES (${vals.join(', ')})`,
+        { name, email, passwordHash, role, username, studentId, staffId, department, programme, level, phone, mustChange, levelScope, token, expires }
       );
-      return fallbackResult.recordset[0];
+      return result.recordset[0];
+    } catch (err) {
+      if (includeLevelScope && isMissingColumnError(err, 'level_scope')) {
+        lastError = err;
+        continue;
+      }
+      if (includeMustChange && isMissingColumnError(err, 'must_change_password')) {
+        lastError = err;
+        continue;
+      }
+      throw err;
     }
-    throw err;
   }
+
+  throw lastError;
 }
 
 async function findByVerificationToken(token) {
@@ -226,15 +261,99 @@ async function updatePassword(id, newPassword) {
   }
 }
 
-async function updateProfile(id, { department, programme, level, phone }) {
-  const result = await query(
-    `UPDATE Users SET department = @department, programme = @programme, level = @level, phone = @phone, updated_at = GETDATE()
-     OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.username, INSERTED.role,
-            INSERTED.student_id, INSERTED.staff_id, INSERTED.department, INSERTED.programme, INSERTED.level, INSERTED.phone
-     WHERE id = @id`,
-    { id, department, programme, level, phone }
-  );
-  return result.recordset[0] || null;
+async function updateProfile(id, { department, programme, level, phone, levelScope = null }) {
+  try {
+    const result = await query(
+      `UPDATE Users SET department = @department, programme = @programme, level = @level, phone = @phone, level_scope = @levelScope, updated_at = GETDATE()
+       OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.username, INSERTED.role,
+              INSERTED.student_id, INSERTED.staff_id, INSERTED.department, INSERTED.programme, INSERTED.level, INSERTED.phone, INSERTED.level_scope
+       WHERE id = @id`,
+      { id, department, programme, level, phone, levelScope }
+    );
+    return result.recordset[0] || null;
+  } catch (err) {
+    if (isMissingColumnError(err, 'level_scope')) {
+      const fallbackResult = await query(
+        `UPDATE Users SET department = @department, programme = @programme, level = @level, phone = @phone, updated_at = GETDATE()
+         OUTPUT INSERTED.id, INSERTED.name, INSERTED.email, INSERTED.username, INSERTED.role,
+                INSERTED.student_id, INSERTED.staff_id, INSERTED.department, INSERTED.programme, INSERTED.level, INSERTED.phone
+         WHERE id = @id`,
+        { id, department, programme, level, phone }
+      );
+      return fallbackResult.recordset[0] || null;
+    }
+    throw err;
+  }
 }
 
-module.exports = { buildUserFindByIdQuery, isMissingColumnError, findByEmail, findByUsername, findByEmailOrUsername, findById, createUser, findByVerificationToken, verifyUser, setVerificationToken, findAll, findAllPaginated, updateRole, setActiveStatus, getStats, findAllStudents, findStudentsByIds, findByIdWithEmail, updatePassword, updateProfile };
+async function findStudentsForAssignment({ department, targetLevel }) {
+  let result;
+  if (department && department.trim()) {
+    result = await query(
+      `SELECT id, name, email, department, level FROM Users
+       WHERE role = 'student'
+         AND (is_active = 1 OR is_active IS NULL)
+         AND LOWER(LTRIM(RTRIM(department))) = LOWER(LTRIM(RTRIM(@department)))`,
+      { department: department.trim() }
+    );
+  } else {
+    result = await query(
+      `SELECT id, name, email, department, level FROM Users
+       WHERE role = 'student' AND (is_active = 1 OR is_active IS NULL)`
+    );
+  }
+
+  const { matchesLevel } = require('../utils/academic');
+  return result.recordset.filter(student => matchesLevel(student.level, targetLevel));
+}
+
+async function findStudentsByDepartment(department, levelScope) {
+  let result;
+  if (department && department.trim()) {
+    result = await query(
+      `SELECT id, name, email, department, level, programme, student_id, phone, created_at FROM Users
+       WHERE role = 'student'
+         AND (is_active = 1 OR is_active IS NULL)
+         AND LOWER(LTRIM(RTRIM(department))) = LOWER(LTRIM(RTRIM(@department)))
+       ORDER BY name ASC`,
+      { department: department.trim() }
+    );
+  } else {
+    result = await query(
+      `SELECT id, name, email, department, level, programme, student_id, phone, created_at FROM Users
+       WHERE role = 'student' AND (is_active = 1 OR is_active IS NULL)
+       ORDER BY name ASC`
+    );
+  }
+
+  if (levelScope) {
+    const { isTargetLevelAllowed } = require('../utils/academic');
+    return result.recordset.filter(student => isTargetLevelAllowed(levelScope, student.level));
+  }
+  return result.recordset;
+}
+
+module.exports = {
+  buildUserFindByIdQuery,
+  isMissingColumnError,
+  findByEmail,
+  findByUsername,
+  findByEmailOrUsername,
+  findById,
+  createUser,
+  findByVerificationToken,
+  verifyUser,
+  setVerificationToken,
+  findAll,
+  findAllPaginated,
+  updateRole,
+  setActiveStatus,
+  getStats,
+  findAllStudents,
+  findStudentsByIds,
+  findByIdWithEmail,
+  updatePassword,
+  updateProfile,
+  findStudentsForAssignment,
+  findStudentsByDepartment,
+};

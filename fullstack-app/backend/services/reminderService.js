@@ -11,20 +11,29 @@ async function checkDeadlines() {
     const now = toStoredUtc(new Date());
     const in24Hours = toStoredUtc(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
-    // Eligible students: active students with an un-submitted assignment due within
-    // 24h, excluding pairs already persisted in ReminderLog. Persisting the log
-    // means a restart can never re-send the same reminder (the old in-memory Set
-    // was wiped on every restart). Emails that fail to send are NOT logged, so the
+    // Eligible students: active students in the lecturer's department with matching
+    // level and an un-submitted assignment due within 24h, excluding pairs already
+    // persisted in ReminderLog. Persisting the log means a restart can never
+    // re-send the same reminder. Emails that fail to send are NOT logged, so the
     // next hourly run naturally retries them.
+    const { matchesLevel } = require('../utils/academic');
+
     const result = await query(
-      `SELECT a.id AS assignment_id, a.title, a.due_date,
-              u.id AS student_id, u.name AS student_name, u.email AS student_email
+      `SELECT a.id AS assignment_id, a.title, a.due_date, a.target_level,
+              u.id AS student_id, u.name AS student_name, u.email AS student_email,
+              u.level AS student_level, u.department AS student_dept,
+              l.department AS lecturer_dept
        FROM Assignments a
+       JOIN Users l ON l.id = a.lecturer_id
        CROSS JOIN Users u
        WHERE u.role = 'student'
          AND (u.is_active = 1 OR u.is_active IS NULL)
          AND a.due_date > @now
          AND a.due_date <= @in24Hours
+         AND (
+           l.department IS NULL
+           OR LOWER(LTRIM(RTRIM(u.department))) = LOWER(LTRIM(RTRIM(l.department)))
+         )
          AND NOT EXISTS (
            SELECT 1 FROM Submissions s
            WHERE s.assignment_id = a.id AND s.student_id = u.id
@@ -37,6 +46,9 @@ async function checkDeadlines() {
     );
 
     for (const row of result.recordset) {
+      if (!matchesLevel(row.student_level, row.target_level)) {
+        continue;
+      }
       try {
         await sendDeadlineReminder(row.student_email, row.student_name, row.title, row.due_date);
         await query(

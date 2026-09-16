@@ -110,9 +110,14 @@ export default function AssignmentsListPage() {
                     <h3 className="font-medium truncate">
                       {a.title}
                     </h3>
-                    <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
+                    <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                       {(a as any).course_code && (
                         <span className="font-medium text-indigo-500">{(a as any).course_code}</span>
+                      )}
+                      {a.target_level && (
+                        <Badge variant="outline" className="text-xs font-normal">
+                          {a.target_level}
+                        </Badge>
                       )}
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5" />

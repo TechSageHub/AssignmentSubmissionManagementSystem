@@ -32,6 +32,7 @@ BEGIN
         level NVARCHAR(20),
         phone NVARCHAR(20),
         must_change_password BIT DEFAULT 0,
+        level_scope NVARCHAR(50),
         created_at DATETIME2 DEFAULT GETDATE(),
         updated_at DATETIME2 DEFAULT GETDATE()
     );
@@ -54,6 +55,7 @@ BEGIN
         file_path NVARCHAR(500),
         course_code NVARCHAR(20),
         course_title NVARCHAR(200),
+        target_level NVARCHAR(50),
         created_at DATETIME2 DEFAULT GETDATE(),
         updated_at DATETIME2 DEFAULT GETDATE(),
         CONSTRAINT FK_Assignments_Lecturer FOREIGN KEY (lecturer_id) REFERENCES Users(id)

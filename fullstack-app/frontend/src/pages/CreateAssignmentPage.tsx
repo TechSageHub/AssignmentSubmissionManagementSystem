@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageTitle } from '@/hooks/usePageTitle'
+import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
 import Layout from '@/components/Layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -8,16 +9,21 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import RubricBuilder from '@/components/RubricBuilder'
+import { getTargetLevels } from '@/constants/academic'
 
 export default function CreateAssignmentPage() {
   usePageTitle('Create Assignment')
+  const { user } = useAuth()
+  const availableLevels = getTargetLevels(user?.level_scope || user?.levelScope)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [courseCode, setCourseCode] = useState('')
   const [courseTitle, setCourseTitle] = useState('')
+  const [targetLevel, setTargetLevel] = useState<string>(availableLevels[0] || 'All Levels')
   const [criteria, setCriteria] = useState<{ name: string; maxScore: number }[]>([])
   const [showRubric, setShowRubric] = useState(false)
   const [error, setError] = useState('')
@@ -37,6 +43,7 @@ export default function CreateAssignmentPage() {
         due_date: new Date(dueDate).toISOString(),
         course_code: courseCode.trim() || undefined,
         course_title: courseTitle.trim() || undefined,
+        target_level: targetLevel || undefined,
       })
       if (criteria.length > 0) {
         await api.put(`/assignments/${data.id}/rubric`, { criteria })
@@ -93,9 +100,22 @@ export default function CreateAssignmentPage() {
                 <Label htmlFor="description">Description</Label>
                 <Textarea id="description" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the assignment requirements..." />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input id="dueDate" type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Input id="dueDate" type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="targetLevel">Target Academic Level</Label>
+                  <Select value={targetLevel} onValueChange={setTargetLevel}>
+                    <SelectTrigger id="targetLevel"><SelectValue placeholder="Select level" /></SelectTrigger>
+                    <SelectContent>
+                      {availableLevels.map((lvl) => (
+                        <SelectItem key={lvl} value={lvl}>{lvl}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="border rounded-lg">

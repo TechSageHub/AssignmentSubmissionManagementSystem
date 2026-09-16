@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
+const { matchesLevel } = require('../utils/academic');
 
-function buildAssignmentCreateQuery(includeCourseFields = true) {
+function buildAssignmentCreateQuery(includeCourseFields = true, includeTargetLevel = true) {
   const columns = ['lecturer_id', 'title', 'description', 'due_date'];
   const values = ['@lecturerId', '@title', '@description', '@dueDate'];
 
@@ -9,14 +10,23 @@ function buildAssignmentCreateQuery(includeCourseFields = true) {
     values.push('@courseCode', '@courseTitle');
   }
 
+  if (includeTargetLevel) {
+    columns.push('target_level');
+    values.push('@targetLevel');
+  }
+
   return `INSERT INTO Assignments (${columns.join(', ')})\n     OUTPUT INSERTED.*\n     VALUES (${values.join(', ')})`;
 }
 
-function buildAssignmentUpdateQuery(includeCourseFields = true) {
+function buildAssignmentUpdateQuery(includeCourseFields = true, includeTargetLevel = true) {
   const setParts = ['title = @title', 'description = @description', 'due_date = @dueDate'];
 
   if (includeCourseFields) {
     setParts.push('course_code = @courseCode', 'course_title = @courseTitle');
+  }
+
+  if (includeTargetLevel) {
+    setParts.push('target_level = @targetLevel');
   }
 
   setParts.push('updated_at = GETDATE()');
@@ -33,15 +43,26 @@ function isMissingColumnError(err, columnName) {
     && /(invalid column name|column .* does not exist|does not exist|undefined column)/i.test(message);
 }
 
-async function create({ lecturerId, title, description, dueDate, courseCode, courseTitle }) {
-  const attempts = [true, false];
+async function create({ lecturerId, title, description, dueDate, courseCode, courseTitle, targetLevel = null }) {
+  const attempts = [
+    { includeCourseFields: true, includeTargetLevel: true },
+    { includeCourseFields: true, includeTargetLevel: false },
+    { includeCourseFields: false, includeTargetLevel: false },
+  ];
   let lastError;
 
-  for (const includeCourseFields of attempts) {
+  for (const { includeCourseFields, includeTargetLevel } of attempts) {
     try {
-      const result = await query(buildAssignmentCreateQuery(includeCourseFields), { lecturerId, title, description, dueDate, courseCode, courseTitle });
+      const result = await query(
+        buildAssignmentCreateQuery(includeCourseFields, includeTargetLevel),
+        { lecturerId, title, description, dueDate, courseCode, courseTitle, targetLevel }
+      );
       return result.recordset[0];
     } catch (err) {
+      if (includeTargetLevel && isMissingColumnError(err, 'target_level')) {
+        lastError = err;
+        continue;
+      }
       if (includeCourseFields && (isMissingColumnError(err, 'course_code') || isMissingColumnError(err, 'course_title'))) {
         lastError = err;
         continue;
@@ -53,7 +74,7 @@ async function create({ lecturerId, title, description, dueDate, courseCode, cou
   throw lastError;
 }
 
-async function findAll(lecturerId, role) {
+async function findAll(lecturerId, role, user = null) {
   if (role === 'lecturer') {
     const result = await query(
       'SELECT * FROM Assignments WHERE lecturer_id = @lecturerId ORDER BY created_at DESC',
@@ -61,6 +82,25 @@ async function findAll(lecturerId, role) {
     );
     return result.recordset;
   }
+
+  if (role === 'student' && user && user.department) {
+    const result = await query(
+      `SELECT a.*,
+        CASE WHEN s.id IS NOT NULL THEN 1 ELSE 0 END AS has_submitted,
+        CASE WHEN s.is_late = 1 THEN 1 ELSE 0 END AS is_late_submission
+       FROM Assignments a
+       JOIN Users l ON l.id = a.lecturer_id
+       LEFT JOIN Submissions s ON s.assignment_id = a.id AND s.student_id = @lecturerId
+       WHERE (l.department IS NULL OR LOWER(LTRIM(RTRIM(l.department))) = LOWER(LTRIM(RTRIM(@userDept))))
+       ORDER BY a.created_at DESC`,
+      { lecturerId, userDept: user.department }
+    );
+    if (user.level) {
+      return result.recordset.filter(a => matchesLevel(user.level, a.target_level));
+    }
+    return result.recordset;
+  }
+
   const result = await query(
     `SELECT a.*,
       CASE WHEN s.id IS NOT NULL THEN 1 ELSE 0 END AS has_submitted,
@@ -78,15 +118,26 @@ async function findById(id) {
   return result.recordset[0] || null;
 }
 
-async function update(id, { title, description, dueDate, courseCode, courseTitle }) {
-  const attempts = [true, false];
+async function update(id, { title, description, dueDate, courseCode, courseTitle, targetLevel = null }) {
+  const attempts = [
+    { includeCourseFields: true, includeTargetLevel: true },
+    { includeCourseFields: true, includeTargetLevel: false },
+    { includeCourseFields: false, includeTargetLevel: false },
+  ];
   let lastError;
 
-  for (const includeCourseFields of attempts) {
+  for (const { includeCourseFields, includeTargetLevel } of attempts) {
     try {
-      const result = await query(buildAssignmentUpdateQuery(includeCourseFields), { id, title, description, dueDate, courseCode, courseTitle });
+      const result = await query(
+        buildAssignmentUpdateQuery(includeCourseFields, includeTargetLevel),
+        { id, title, description, dueDate, courseCode, courseTitle, targetLevel }
+      );
       return result.recordset[0] || null;
     } catch (err) {
+      if (includeTargetLevel && isMissingColumnError(err, 'target_level')) {
+        lastError = err;
+        continue;
+      }
       if (includeCourseFields && (isMissingColumnError(err, 'course_code') || isMissingColumnError(err, 'course_title'))) {
         lastError = err;
         continue;

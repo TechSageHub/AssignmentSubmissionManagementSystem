@@ -16,8 +16,25 @@ test('buildAssignmentUpdateQuery omits course columns when requested', () => {
   assert.doesNotMatch(sql, /course_code|course_title/);
 });
 
+test('buildAssignmentCreateQuery includes target_level by default and omits when requested', () => {
+  const withLevel = buildAssignmentCreateQuery(true, true);
+  assert.match(withLevel, /target_level/);
+
+  const withoutLevel = buildAssignmentCreateQuery(true, false);
+  assert.doesNotMatch(withoutLevel, /target_level/);
+});
+
+test('buildAssignmentUpdateQuery includes target_level by default and omits when requested', () => {
+  const withLevel = buildAssignmentUpdateQuery(true, true);
+  assert.match(withLevel, /target_level = @targetLevel/);
+
+  const withoutLevel = buildAssignmentUpdateQuery(true, false);
+  assert.doesNotMatch(withoutLevel, /target_level/);
+});
+
 test('isMissingColumnError detects missing-column errors', () => {
   assert.equal(isMissingColumnError(new Error("Invalid column name 'course_code'"), 'course_code'), true);
   assert.equal(isMissingColumnError(new Error('column "course_title" does not exist'), 'course_title'), true);
+  assert.equal(isMissingColumnError(new Error("Invalid column name 'target_level'"), 'target_level'), true);
   assert.equal(isMissingColumnError(new Error('some other database error'), 'course_code'), false);
 });

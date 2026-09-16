@@ -10,6 +10,8 @@ export interface User {
   programme?: string
   level?: string
   phone?: string
+  level_scope?: string
+  levelScope?: string
   is_active?: boolean
   is_verified?: boolean
   mustChangePassword?: boolean
@@ -43,6 +45,7 @@ export interface CreateUserData {
   programme?: string
   level?: string
   phone?: string
+  levelScope?: string
 }
 
 export interface Assignment {
@@ -52,6 +55,9 @@ export interface Assignment {
   description: string
   due_date: string
   file_path: string | null
+  course_code?: string
+  course_title?: string
+  target_level?: string
   created_at: string
   updated_at: string
 }
@@ -60,6 +66,9 @@ export interface CreateAssignmentData {
   title: string
   description: string
   due_date: string
+  course_code?: string
+  course_title?: string
+  target_level?: string
 }
 
 export interface Submission {

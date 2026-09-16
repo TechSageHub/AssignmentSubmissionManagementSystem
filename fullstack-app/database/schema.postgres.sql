@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS Users (
     level VARCHAR(20),
     phone VARCHAR(20),
     must_change_password BOOLEAN DEFAULT FALSE,
+    level_scope VARCHAR(50),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS Assignments (
     file_path VARCHAR(500),
     course_code VARCHAR(20),
     course_title VARCHAR(200),
+    target_level VARCHAR(50),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

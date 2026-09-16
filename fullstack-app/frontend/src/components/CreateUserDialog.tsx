@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DEPARTMENTS, STUDENT_LEVELS, LECTURER_LEVEL_SCOPES } from '@/constants/academic'
 import { UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
-
-const levels = ['ND I', 'ND II', 'HND I', 'HND II']
 
 const roleLabels: Record<string, string> = {
   student: 'Student',
@@ -33,15 +32,19 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
   const [role, setRole] = useState<Role>(allowedRoles[0])
   const [studentId, setStudentId] = useState('')
   const [staffId, setStaffId] = useState('')
-  const [department, setDepartment] = useState('')
+  const [selectedDept, setSelectedDept] = useState('')
+  const [customDept, setCustomDept] = useState('')
   const [programme, setProgramme] = useState('')
   const [level, setLevel] = useState('')
+  const [levelScope, setLevelScope] = useState<string>('both')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const effectiveDepartment = selectedDept === 'OTHER' ? customDept.trim() : selectedDept
+
   const reset = () => {
     setName(''); setEmail(''); setPassword(''); setRole(allowedRoles[0])
-    setStudentId(''); setStaffId(''); setDepartment(''); setProgramme(''); setLevel(''); setPhone('')
+    setStudentId(''); setStaffId(''); setSelectedDept(''); setCustomDept(''); setProgramme(''); setLevel(''); setLevelScope('both'); setPhone('')
   }
 
   const handleClose = (next: boolean) => {
@@ -57,9 +60,10 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
         name, email, password, role,
         studentId: role === 'student' ? studentId : undefined,
         staffId: role === 'lecturer' ? staffId : undefined,
-        department: department || undefined,
+        department: effectiveDepartment || undefined,
         programme: role === 'student' ? programme : undefined,
         level: role === 'student' ? level : undefined,
+        levelScope: role === 'lecturer' ? levelScope : undefined,
         phone: phone || undefined,
       })
       toast.success('Account created. A verification email has been sent to the user.')
@@ -135,7 +139,7 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
                 <Select value={level} onValueChange={setLevel}>
                   <SelectTrigger id="cu-level"><SelectValue placeholder="Select level" /></SelectTrigger>
                   <SelectContent>
-                    {levels.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}
+                    {STUDENT_LEVELS.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
@@ -143,15 +147,46 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
           )}
 
           {role === 'lecturer' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="cu-staff-id">Staff ID</Label>
-              <Input id="cu-staff-id" value={staffId} onChange={(e) => setStaffId(e.target.value)} placeholder="e.g. FPI/STAFF/001" required />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="cu-staff-id">Staff ID</Label>
+                <Input id="cu-staff-id" value={staffId} onChange={(e) => setStaffId(e.target.value)} placeholder="e.g. FPI/STAFF/001" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cu-scope">Teaching Scope</Label>
+                <Select value={levelScope} onValueChange={setLevelScope}>
+                  <SelectTrigger id="cu-scope"><SelectValue placeholder="Select teaching scope" /></SelectTrigger>
+                  <SelectContent>
+                    {LECTURER_LEVEL_SCOPES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Select whether this lecturer teaches ND only, HND only, or both.</p>
+              </div>
+            </>
           )}
 
           <div className="space-y-1.5">
             <Label htmlFor="cu-dept">Department</Label>
-            <Input id="cu-dept" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Computer Science" />
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger id="cu-dept"><SelectValue placeholder="Select department" /></SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+                <SelectItem value="OTHER">Other (Specify manually)</SelectItem>
+              </SelectContent>
+            </Select>
+            {selectedDept === 'OTHER' && (
+              <Input
+                className="mt-1.5"
+                value={customDept}
+                onChange={(e) => setCustomDept(e.target.value)}
+                placeholder="Type department name..."
+                required
+              />
+            )}
           </div>
 
           <div className="space-y-1.5">

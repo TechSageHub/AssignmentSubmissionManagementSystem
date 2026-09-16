@@ -3,6 +3,7 @@ const userModel = require('../models/user');
 const { sendAssignmentCreated } = require('../utils/emailHelper');
 const { notifyAssignmentCreated } = require('../utils/notificationHelper');
 const { parseInputDate, toStoredUtc, toIsoUtc } = require('../utils/dates');
+const { isTargetLevelAllowed } = require('../utils/academic');
 const auditLog = require('../utils/auditLogger');
 
 function withUtcDueDate(row) {
@@ -14,7 +15,7 @@ function withUtcDueDate(row) {
 
 async function createAssignment(req, res, next) {
   try {
-    const { title, description, due_date, course_code, course_title } = req.body;
+    const { title, description, due_date, course_code, course_title, target_level } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
@@ -24,6 +25,13 @@ async function createAssignment(req, res, next) {
     }
     if (!due_date) {
       return res.status(400).json({ error: 'ValidationError', details: 'Due date is required' });
+    }
+
+    if (target_level && req.user.level_scope && !isTargetLevelAllowed(req.user.level_scope, target_level)) {
+      return res.status(400).json({
+        error: 'ValidationError',
+        details: `Your teaching scope does not permit assigning to ${target_level}.`
+      });
     }
 
     // The client sends an ISO instant (with Z). Legacy naive "YYYY-MM-DDTHH:mm"
@@ -44,11 +52,15 @@ async function createAssignment(req, res, next) {
       dueDate: toStoredUtc(dueDateTime),
       courseCode: course_code || null,
       courseTitle: course_title || null,
+      targetLevel: target_level || null,
     });
 
-    // Notify all students
+    // Notify students matching lecturer's department and target level
     try {
-      const students = await userModel.findAllStudents();
+      const students = await userModel.findStudentsForAssignment({
+        department: req.user.department,
+        targetLevel: target_level || null,
+      });
       const lecturerName = req.user.name;
       const studentIds = students.map(s => s.id);
       await notifyAssignmentCreated(studentIds, title, assignment.id);
@@ -69,7 +81,7 @@ async function createAssignment(req, res, next) {
 
 async function getAssignments(req, res, next) {
   try {
-    const assignments = await assignmentModel.findAll(req.user.id, req.user.role);
+    const assignments = await assignmentModel.findAll(req.user.id, req.user.role, req.user);
     res.json(assignments.map(withUtcDueDate));
   } catch (err) {
     next(err);
@@ -106,9 +118,16 @@ async function updateAssignment(req, res, next) {
       return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
     }
 
-    const { title, description, due_date, course_code, course_title } = req.body;
+    const { title, description, due_date, course_code, course_title, target_level } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
+    }
+
+    if (target_level && req.user.level_scope && !isTargetLevelAllowed(req.user.level_scope, target_level)) {
+      return res.status(400).json({
+        error: 'ValidationError',
+        details: `Your teaching scope does not permit assigning to ${target_level}.`
+      });
     }
 
     // Keep stored value unless a new date is supplied. When supplied, parse the
@@ -133,6 +152,7 @@ async function updateAssignment(req, res, next) {
       dueDate,
       courseCode: course_code !== undefined ? course_code : assignment.course_code,
       courseTitle: course_title !== undefined ? course_title : assignment.course_title,
+      targetLevel: target_level !== undefined ? target_level : assignment.target_level,
     });
 
     res.json(withUtcDueDate(updated));

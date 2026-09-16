@@ -13,26 +13,36 @@ import { Separator } from '@/components/ui/separator'
 import { ErrorState } from '@/components/PageState'
 import { User, Mail, Hash, BadgeCheck, Save } from 'lucide-react'
 import { toast } from 'sonner'
-
-const levels = ['ND I', 'ND II', 'HND I', 'HND II']
+import { DEPARTMENTS, STUDENT_LEVELS, LECTURER_LEVEL_SCOPES } from '@/constants/academic'
 
 export default function ProfilePage() {
   usePageTitle('Profile')
   const { user, token } = useAuth()
-  const [department, setDepartment] = useState('')
+  const [selectedDept, setSelectedDept] = useState('')
+  const [customDept, setCustomDept] = useState('')
   const [programme, setProgramme] = useState('')
   const [level, setLevel] = useState('')
+  const [levelScope, setLevelScope] = useState('both')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  const effectiveDepartment = selectedDept === 'OTHER' ? customDept.trim() : selectedDept
+
   useEffect(() => {
     if (user && token) {
       api.get('/auth/me').then(({ data }) => {
-        setDepartment((data as any).department || '')
+        const dept = (data as any).department || ''
+        if (DEPARTMENTS.includes(dept as any)) {
+          setSelectedDept(dept)
+        } else if (dept) {
+          setSelectedDept('OTHER')
+          setCustomDept(dept)
+        }
         setProgramme((data as any).programme || '')
         setLevel((data as any).level || '')
+        setLevelScope((data as any).level_scope || (data as any).levelScope || 'both')
         setPhone((data as any).phone || '')
       }).catch(() => setLoadError(true)).finally(() => setLoading(false))
     }
@@ -42,7 +52,13 @@ export default function ProfilePage() {
     e.preventDefault()
     setSaving(true)
     try {
-      const { data } = await api.put('/users/profile', { department, programme, level, phone })
+      const { data } = await api.put('/users/profile', {
+        department: effectiveDepartment,
+        programme,
+        level,
+        levelScope: user?.role === 'lecturer' ? levelScope : undefined,
+        phone,
+      })
       toast.success('Profile updated successfully')
       localStorage.setItem('user', JSON.stringify({ ...user, ...data }))
     } catch (err: unknown) {
@@ -127,7 +143,26 @@ export default function ProfilePage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="dept">Department</Label>
-                      <Input id="dept" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Computer Science" />
+                      <Select value={selectedDept} onValueChange={setSelectedDept}>
+                        <SelectTrigger id="dept" className="h-11">
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DEPARTMENTS.map((d) => (
+                            <SelectItem key={d} value={d}>{d}</SelectItem>
+                          ))}
+                          <SelectItem value="OTHER">Other (Specify manually)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {selectedDept === 'OTHER' && (
+                        <Input
+                          className="mt-1.5"
+                          value={customDept}
+                          onChange={(e) => setCustomDept(e.target.value)}
+                          placeholder="Type department name..."
+                          required
+                        />
+                      )}
                     </div>
                     {user.role === 'student' && (
                       <>
@@ -142,13 +177,29 @@ export default function ProfilePage() {
                               <SelectValue placeholder="Select level" />
                             </SelectTrigger>
                             <SelectContent>
-                              {levels.map((l) => (
+                              {STUDENT_LEVELS.map((l) => (
                                 <SelectItem key={l} value={l}>{l}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
                       </>
+                    )}
+                    {user.role === 'lecturer' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="scope">Teaching Scope</Label>
+                        <Select value={levelScope} onValueChange={setLevelScope}>
+                          <SelectTrigger id="scope" className="h-11">
+                            <SelectValue placeholder="Select teaching scope" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {LECTURER_LEVEL_SCOPES.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Restricts the level of assignments you can create (ND, HND, or both).</p>
+                      </div>
                     )}
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone Number</Label>
