@@ -13,6 +13,7 @@ import {
   Shield,
   Settings,
   BookOpen,
+  Megaphone,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,7 @@ const navItems = [
   { icon: BookOpen, label: 'Courses', path: '/admin/courses', roles: ['admin'] },
   { icon: ClipboardList, label: 'Assignments', path: '/assignments', roles: ['student', 'lecturer'] },
   { icon: UserPlus, label: 'Students', path: '/students', roles: ['lecturer'] },
+{ icon: Megaphone, label: 'Announcements', path: '/announcements', roles: ['student', 'lecturer', 'admin'] },
   { icon: FileText, label: 'My Submissions', path: '/my-submissions', roles: ['student'] },
   { icon: Settings, label: 'Profile', path: '/profile', roles: ['student', 'lecturer'] },
 ]

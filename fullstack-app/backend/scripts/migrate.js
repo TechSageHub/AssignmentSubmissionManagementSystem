@@ -24,6 +24,7 @@ const migrations = dbType === 'postgres'
       'migration_017_add_submission_history.postgres.sql',
       'migration_018_add_grade_release.postgres.sql',
       'migration_019_add_rubric_weight.postgres.sql',
+      'migration_020_add_announcements.postgres.sql',
     ]
   : [
       'migration_001_add_verification.sql',
@@ -45,6 +46,7 @@ const migrations = dbType === 'postgres'
       'migration_017_add_submission_history.sql',
       'migration_018_add_grade_release.sql',
       'migration_019_add_rubric_weight.sql',
+      'migration_020_add_announcements.sql',
     ];
 
 function splitStatements(sql) {

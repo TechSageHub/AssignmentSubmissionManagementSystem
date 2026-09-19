@@ -78,4 +78,21 @@ async function sendDeadlineReminder(studentEmail, studentName, assignmentTitle, 
   });
 }
 
-module.exports = { sendAssignmentCreated, sendSubmissionConfirmation, sendGradeReleased, sendDeadlineReminder };
+async function sendAnnouncement(studentEmail, studentName, announcementTitle, message) {
+  await sendEmail({
+    to: studentEmail,
+    subject: `Announcement: ${escapeHtml(announcementTitle)}`,
+    html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #6366f1;">Announcement</h2>
+      <p>Hi <strong>${escapeHtml(studentName)}</strong>,</p>
+      <p><strong>${escapeHtml(announcementTitle)}</strong></p>
+      <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <p style="margin: 0; white-space: pre-wrap;">${escapeHtml(message)}</p>
+      </div>
+      <p><a href="${baseUrl}/announcements" style="background: #6366f1; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none;">View Announcement</a></p>
+      <p style="color: #94a3b8; font-size: 12px;">You are receiving this because you are registered on ASMS.</p>
+    </div>`,
+  });
+}
+
+module.exports = { sendAssignmentCreated, sendSubmissionConfirmation, sendGradeReleased, sendDeadlineReminder, sendAnnouncement };

@@ -28,6 +28,7 @@ const UserManagementPage = lazy(() => import('@/pages/UserManagementPage'))
 const CourseManagementPage = lazy(() => import('@/pages/CourseManagementPage'))
 const LecturerStudentsPage = lazy(() => import('@/pages/LecturerStudentsPage'))
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
+const AnnouncementsPage = lazy(() => import('@/pages/AnnouncementsPage'))
 
 function PageFallback() {
   return <FullPageSpinner />
@@ -88,6 +89,9 @@ function AppContent() {
       } />
       <Route path="/my-submissions" element={
         <ProtectedRoute><MySubmissionsPage /></ProtectedRoute>
+      } />
+      <Route path="/announcements" element={
+        <ProtectedRoute><AnnouncementsPage /></ProtectedRoute>
       } />
       <Route path="/submissions/:submissionId" element={
         <ProtectedRoute><ViewSubmissionPage /></ProtectedRoute>

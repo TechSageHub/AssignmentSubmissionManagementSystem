@@ -81,10 +81,26 @@ function isTargetLevelAllowed(lecturerScope, targetLevel) {
   return true;
 }
 
+// Normalize a user's targeting context so level matching works uniformly:
+// students compare their level, lecturers their level scope, and admins get a
+// permissive scope. department is shared by all.
+function getTargetFields(user) {
+  if (!user) return { department: null, level: null, level_scope: null };
+  const department = user.department || null;
+  if (user.role === 'student') {
+    return { department, level: user.level || null, level_scope: null };
+  }
+  if (user.role === 'lecturer') {
+    return { department, level: null, level_scope: user.level_scope || null };
+  }
+  return { department, level: null, level_scope: user.level_scope || null };
+}
+
 module.exports = {
   normalizeDept,
   isSameDepartment,
   normalizeLevel,
   matchesLevel,
   isTargetLevelAllowed,
+  getTargetFields,
 };

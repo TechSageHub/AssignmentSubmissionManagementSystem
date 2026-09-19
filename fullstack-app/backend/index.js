@@ -64,6 +64,7 @@ const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 const courseRoutes = require('./routes/courses');
+const announcementRoutes = require('./routes/announcements');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/assignments', assignmentRoutes);
@@ -72,6 +73,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Public config endpoint (used by frontend for branding and ngrok URL)
 app.get('/api/config', async (_req, res, next) => {
