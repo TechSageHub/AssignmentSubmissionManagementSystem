@@ -1,7 +1,7 @@
 const { query } = require('../config/db');
 const { matchesLevel } = require('../utils/academic');
 
-function buildAssignmentCreateQuery(includeCourseFields = true, includeTargetLevel = true, includeCourseLink = true, includeLatePolicy = true) {
+function buildAssignmentCreateQuery(includeCourseFields = true, includeTargetLevel = true, includeCourseLink = true, includeLatePolicy = true, includePublishDate = true) {
   const columns = ['lecturer_id', 'title', 'description', 'due_date'];
   const values = ['@lecturerId', '@title', '@description', '@dueDate'];
 
@@ -25,10 +25,15 @@ function buildAssignmentCreateQuery(includeCourseFields = true, includeTargetLev
     values.push('@acceptLateSubmissions', '@lateCutoff');
   }
 
+  if (includePublishDate) {
+    columns.push('publish_date');
+    values.push('@publishDate');
+  }
+
   return `INSERT INTO Assignments (${columns.join(', ')})\n     OUTPUT INSERTED.*\n     VALUES (${values.join(', ')})`;
 }
 
-function buildAssignmentUpdateQuery(includeCourseFields = true, includeTargetLevel = true, includeCourseLink = true, includeLatePolicy = true) {
+function buildAssignmentUpdateQuery(includeCourseFields = true, includeTargetLevel = true, includeCourseLink = true, includeLatePolicy = true, includePublishDate = true) {
   const setParts = ['title = @title', 'description = @description', 'due_date = @dueDate'];
 
   if (includeCourseFields) {
@@ -47,6 +52,10 @@ function buildAssignmentUpdateQuery(includeCourseFields = true, includeTargetLev
     setParts.push('accept_late_submissions = @acceptLateSubmissions', 'late_cutoff = @lateCutoff');
   }
 
+  if (includePublishDate) {
+    setParts.push('publish_date = @publishDate');
+  }
+
   setParts.push('updated_at = GETDATE()');
 
   return `UPDATE Assignments\n     SET ${setParts.join(', ')}\n     OUTPUT INSERTED.*\n     WHERE id = @id`;
@@ -61,24 +70,29 @@ function isMissingColumnError(err, columnName) {
     && /(invalid column name|column .* does not exist|does not exist|undefined column)/i.test(message);
 }
 
-async function create({ lecturerId, title, description, dueDate, courseCode, courseTitle, targetLevel = null, courseId = null, semester = null, acceptLateSubmissions = 1, lateCutoff = null }) {
+async function create({ lecturerId, title, description, dueDate, courseCode, courseTitle, targetLevel = null, courseId = null, semester = null, acceptLateSubmissions = 1, lateCutoff = null, publishDate = null }) {
   const attempts = [
-    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: true },
-    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: false },
-    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: false, includeLatePolicy: false },
-    { includeCourseFields: true, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false },
-    { includeCourseFields: false, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: true, includePublishDate: true },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: true, includePublishDate: false },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: false, includePublishDate: false },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: false, includeLatePolicy: false, includePublishDate: false },
+    { includeCourseFields: true, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false, includePublishDate: false },
+    { includeCourseFields: false, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false, includePublishDate: false },
   ];
   let lastError;
 
-  for (const { includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy } of attempts) {
+  for (const { includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy, includePublishDate } of attempts) {
     try {
       const result = await query(
-        buildAssignmentCreateQuery(includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy),
-        { lecturerId, title, description, dueDate, courseCode, courseTitle, targetLevel, courseId, semester, acceptLateSubmissions, lateCutoff }
+        buildAssignmentCreateQuery(includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy, includePublishDate),
+        { lecturerId, title, description, dueDate, courseCode, courseTitle, targetLevel, courseId, semester, acceptLateSubmissions, lateCutoff, publishDate }
       );
       return result.recordset[0];
     } catch (err) {
+      if (includePublishDate && isMissingColumnError(err, 'publish_date')) {
+        lastError = err;
+        continue;
+      }
       if (includeLatePolicy && (isMissingColumnError(err, 'accept_late_submissions') || isMissingColumnError(err, 'late_cutoff'))) {
         lastError = err;
         continue;
@@ -120,6 +134,7 @@ async function findAll(lecturerId, role, user = null) {
        JOIN Users l ON l.id = a.lecturer_id
        LEFT JOIN Submissions s ON s.assignment_id = a.id AND s.student_id = @lecturerId
        WHERE (l.department IS NULL OR LOWER(LTRIM(RTRIM(l.department))) = LOWER(LTRIM(RTRIM(@userDept))))
+         AND (a.publish_date IS NULL OR a.publish_date <= SYSUTCDATETIME())
        ORDER BY a.created_at DESC`,
       { lecturerId, userDept: user.department }
     );
@@ -135,6 +150,7 @@ async function findAll(lecturerId, role, user = null) {
       CASE WHEN s.is_late = 1 THEN 1 ELSE 0 END AS is_late_submission
      FROM Assignments a
      LEFT JOIN Submissions s ON s.assignment_id = a.id AND s.student_id = @lecturerId
+     WHERE a.publish_date IS NULL OR a.publish_date <= SYSUTCDATETIME()
      ORDER BY a.created_at DESC`,
     { lecturerId }
   );
@@ -146,24 +162,29 @@ async function findById(id) {
   return result.recordset[0] || null;
 }
 
-async function update(id, { title, description, dueDate, courseCode, courseTitle, targetLevel = null, courseId = null, semester = null, acceptLateSubmissions = 1, lateCutoff = null }) {
+async function update(id, { title, description, dueDate, courseCode, courseTitle, targetLevel = null, courseId = null, semester = null, acceptLateSubmissions = 1, lateCutoff = null, publishDate = null }) {
   const attempts = [
-    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: true },
-    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: false },
-    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: false, includeLatePolicy: false },
-    { includeCourseFields: true, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false },
-    { includeCourseFields: false, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: true, includePublishDate: true },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: true, includePublishDate: false },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: true, includeLatePolicy: false, includePublishDate: false },
+    { includeCourseFields: true, includeTargetLevel: true, includeCourseLink: false, includeLatePolicy: false, includePublishDate: false },
+    { includeCourseFields: true, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false, includePublishDate: false },
+    { includeCourseFields: false, includeTargetLevel: false, includeCourseLink: false, includeLatePolicy: false, includePublishDate: false },
   ];
   let lastError;
 
-  for (const { includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy } of attempts) {
+  for (const { includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy, includePublishDate } of attempts) {
     try {
       const result = await query(
-        buildAssignmentUpdateQuery(includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy),
-        { id, title, description, dueDate, courseCode, courseTitle, targetLevel, courseId, semester, acceptLateSubmissions, lateCutoff }
+        buildAssignmentUpdateQuery(includeCourseFields, includeTargetLevel, includeCourseLink, includeLatePolicy, includePublishDate),
+        { id, title, description, dueDate, courseCode, courseTitle, targetLevel, courseId, semester, acceptLateSubmissions, lateCutoff, publishDate }
       );
       return result.recordset[0] || null;
     } catch (err) {
+      if (includePublishDate && isMissingColumnError(err, 'publish_date')) {
+        lastError = err;
+        continue;
+      }
       if (includeLatePolicy && (isMissingColumnError(err, 'accept_late_submissions') || isMissingColumnError(err, 'late_cutoff'))) {
         lastError = err;
         continue;

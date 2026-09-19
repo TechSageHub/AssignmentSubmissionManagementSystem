@@ -14,6 +14,9 @@ function withUtcDueDate(row) {
   if (row && row.late_cutoff != null) {
     row.late_cutoff = toIsoUtc(row.late_cutoff);
   }
+  if (row && row.publish_date != null) {
+    row.publish_date = toIsoUtc(row.publish_date);
+  }
   return row;
 }
 
@@ -43,7 +46,7 @@ async function resolveCourseFields({ courseId, courseCode, courseTitle }) {
 
 async function createAssignment(req, res, next) {
   try {
-    const { title, description, due_date, course_code, course_title, course_id, semester, target_level, accept_late_submissions, late_cutoff } = req.body;
+    const { title, description, due_date, course_code, course_title, course_id, semester, target_level, accept_late_submissions, late_cutoff, publish_date } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
@@ -87,6 +90,15 @@ async function createAssignment(req, res, next) {
       lateCutoff = toStoredUtc(parsedCutoff);
     }
 
+    let publishDate = null;
+    if (publish_date) {
+      const parsedPublish = parseInputDate(publish_date);
+      if (!parsedPublish) {
+        return res.status(400).json({ error: 'ValidationError', details: 'Publish date must be a valid date and time' });
+      }
+      publishDate = toStoredUtc(parsedPublish);
+    }
+
     const assignment = await assignmentModel.create({
       lecturerId: req.user.id,
       title: title.trim(),
@@ -97,22 +109,26 @@ async function createAssignment(req, res, next) {
       targetLevel: target_level || null,
       acceptLateSubmissions: toBit(accept_late_submissions),
       lateCutoff,
+      publishDate,
     });
 
-    // Notify students matching lecturer's department and target level
-    try {
-      const students = await userModel.findStudentsForAssignment({
-        department: req.user.department,
-        targetLevel: target_level || null,
-      });
-      const lecturerName = req.user.name;
-      const studentIds = students.map(s => s.id);
-      await notifyAssignmentCreated(studentIds, title, assignment.id);
-      for (const student of students) {
-        await sendAssignmentCreated(student.email, student.name, title, dueDateTime, lecturerName);
+    // Notify students matching lecturer's department and target level, but only
+    // when the assignment is visible to them right away.
+    if (!publishDate || parseInputDate(publishDate) <= new Date()) {
+      try {
+        const students = await userModel.findStudentsForAssignment({
+          department: req.user.department,
+          targetLevel: target_level || null,
+        });
+        const lecturerName = req.user.name;
+        const studentIds = students.map(s => s.id);
+        await notifyAssignmentCreated(studentIds, title, assignment.id);
+        for (const student of students) {
+          await sendAssignmentCreated(student.email, student.name, title, dueDateTime, lecturerName);
+        }
+      } catch (emailErr) {
+        console.error('Failed to send assignment notification emails:', emailErr.message);
       }
-    } catch (emailErr) {
-      console.error('Failed to send assignment notification emails:', emailErr.message);
     }
 
     auditLog.log(req, 'create', 'assignment', assignment.id, { title });
@@ -142,6 +158,11 @@ async function getAssignment(req, res, next) {
     if (!assignment) {
       return res.status(404).json({ error: 'NotFoundError', details: 'Assignment not found' });
     }
+    // Students must not see assignments whose scheduled publish date has not
+    // arrived yet.
+    if (req.user.role === 'student' && assignment.publish_date != null && parseInputDate(assignment.publish_date) > new Date()) {
+      return res.status(404).json({ error: 'NotFoundError', details: 'Assignment not found' });
+    }
     res.json(withUtcDueDate(assignment));
   } catch (err) {
     next(err);
@@ -162,7 +183,7 @@ async function updateAssignment(req, res, next) {
       return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
     }
 
-    const { title, description, due_date, course_code, course_title, course_id, semester, target_level, accept_late_submissions, late_cutoff } = req.body;
+    const { title, description, due_date, course_code, course_title, course_id, semester, target_level, accept_late_submissions, late_cutoff, publish_date } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
     }
@@ -213,6 +234,21 @@ async function updateAssignment(req, res, next) {
       }
     }
 
+    // Keep existing publish date unless a new value is supplied. An empty
+    // string publishes immediately (clears the schedule).
+    let publishDate = assignment.publish_date != null ? toStoredUtc(assignment.publish_date) : null;
+    if (publish_date !== undefined) {
+      if (publish_date === null || publish_date === '') {
+        publishDate = null;
+      } else {
+        const parsedPublish = parseInputDate(publish_date);
+        if (!parsedPublish) {
+          return res.status(400).json({ error: 'ValidationError', details: 'Publish date must be a valid date and time' });
+        }
+        publishDate = toStoredUtc(parsedPublish);
+      }
+    }
+
     const courseFields = await resolveCourseFields({
       courseId: course_id !== undefined ? course_id : assignment.course_id,
       courseCode: course_code !== undefined ? course_code : assignment.course_code,
@@ -228,6 +264,7 @@ async function updateAssignment(req, res, next) {
       targetLevel: target_level !== undefined ? target_level : assignment.target_level,
       acceptLateSubmissions: acceptLate,
       lateCutoff,
+      publishDate,
     });
 
     res.json(withUtcDueDate(updated));

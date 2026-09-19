@@ -39,6 +39,9 @@ export default function AssignmentsListPage() {
   }, [])
 
   const statusBadge = (a: AssignmentWithStatus) => {
+    if ((a as any).publish_date && new Date() < new Date((a as any).publish_date)) {
+      return <Badge variant="secondary">Scheduled</Badge>
+    }
     if (a.has_submitted) return <Badge variant="success">Submitted</Badge>
     if (new Date() > new Date(a.due_date)) return <Badge variant="destructive">Overdue</Badge>
     return <Badge variant="warning">Pending</Badge>

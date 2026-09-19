@@ -105,6 +105,7 @@ function convertPgSql(sql, params) {
     }
   );
   s = s.replace(/\bGETDATE\(\)/gi, 'NOW()');
+  s = s.replace(/\bSYSUTCDATETIME\(\)/gi, 'NOW()');
   s = s.replace(/\b(is_active|is_verified|is_late|is_read|must_change_password)\s*=\s*1\b/gi, '$1 = true');
   s = s.replace(/\b(is_active|is_verified|is_late|is_read|must_change_password)\s*=\s*0\b/gi, '$1 = false');
   s = s.replace(/\[(\w+)\]/g, '"$1"');

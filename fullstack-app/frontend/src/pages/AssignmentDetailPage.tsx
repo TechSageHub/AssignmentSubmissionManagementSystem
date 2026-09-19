@@ -146,6 +146,12 @@ export default function AssignmentDetailPage() {
                     </span>
                   </div>
                 </div>
+                {(assignment as any).publish_date && now < new Date((assignment as any).publish_date) && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Scheduled · {new Date((assignment as any).publish_date).toLocaleDateString()}
+                  </Badge>
+                )}
                 {isOverdue && (
                   <Badge variant="destructive" className="flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />

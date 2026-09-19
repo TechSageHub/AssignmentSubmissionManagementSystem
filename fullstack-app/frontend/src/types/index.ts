@@ -71,6 +71,7 @@ export interface Assignment {
   target_level?: string
   accept_late_submissions?: boolean
   late_cutoff?: string | null
+  publish_date?: string | null
   created_at: string
   updated_at: string
 }
@@ -86,6 +87,7 @@ export interface CreateAssignmentData {
   target_level?: string
   accept_late_submissions?: boolean
   late_cutoff?: string | null
+  publish_date?: string | null
 }
 
 export interface Submission {

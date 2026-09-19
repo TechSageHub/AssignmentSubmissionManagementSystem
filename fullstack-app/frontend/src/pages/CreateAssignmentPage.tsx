@@ -32,6 +32,8 @@ export default function CreateAssignmentPage() {
   const [targetLevel, setTargetLevel] = useState<string>(availableLevels[0] || 'All Levels')
   const [acceptLate, setAcceptLate] = useState(true)
   const [lateCutoff, setLateCutoff] = useState('')
+  const [publishDate, setPublishDate] = useState('')
+  const [showScheduling, setShowScheduling] = useState(false)
   const [criteria, setCriteria] = useState<{ name: string; maxScore: number }[]>([])
   const [showRubric, setShowRubric] = useState(false)
   const [showLatePolicy, setShowLatePolicy] = useState(false)
@@ -63,6 +65,7 @@ export default function CreateAssignmentPage() {
         target_level: targetLevel || undefined,
         accept_late_submissions: acceptLate,
         late_cutoff: lateCutoff.trim() ? new Date(lateCutoff).toISOString() : null,
+        publish_date: publishDate.trim() ? new Date(publishDate).toISOString() : null,
       })
       if (criteria.length > 0) {
         await api.put(`/assignments/${data.id}/rubric`, { criteria })
@@ -173,6 +176,24 @@ export default function CreateAssignmentPage() {
                 {showRubric && (
                   <div className="border-t p-3">
                     <RubricBuilder criteria={criteria} onChange={setCriteria} />
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-lg">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between p-3 text-sm font-medium"
+                  onClick={() => setShowScheduling(!showScheduling)}
+                >
+                  <span>Scheduling</span>
+                  {showScheduling ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                {showScheduling && (
+                  <div className="border-t space-y-2 p-3">
+                    <Label htmlFor="publishDate">Publish Date <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input id="publishDate" type="datetime-local" value={publishDate} onChange={(e) => setPublishDate(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Leave empty to publish immediately. Students only see the assignment after this time.</p>
                   </div>
                 )}
               </div>

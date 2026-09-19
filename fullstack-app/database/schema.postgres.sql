@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS Assignments (
     target_level VARCHAR(50),
     accept_late_submissions BOOLEAN NOT NULL DEFAULT TRUE,
     late_cutoff TIMESTAMP,
+    publish_date TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -56,6 +57,7 @@ ALTER TABLE Assignments ADD COLUMN IF NOT EXISTS course_id INT REFERENCES Course
 ALTER TABLE Assignments ADD COLUMN IF NOT EXISTS semester VARCHAR(50);
 ALTER TABLE Assignments ADD COLUMN IF NOT EXISTS accept_late_submissions BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE Assignments ADD COLUMN IF NOT EXISTS late_cutoff TIMESTAMP;
+ALTER TABLE Assignments ADD COLUMN IF NOT EXISTS publish_date TIMESTAMP;
 
 CREATE INDEX IF NOT EXISTS IX_Assignments_lecturer_id ON Assignments(lecturer_id);
 CREATE INDEX IF NOT EXISTS IX_Assignments_course_id ON Assignments(course_id);

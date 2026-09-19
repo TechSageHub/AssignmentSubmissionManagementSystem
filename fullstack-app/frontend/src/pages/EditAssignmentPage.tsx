@@ -35,6 +35,8 @@ export default function EditAssignmentPage() {
   const [acceptLate, setAcceptLate] = useState(true)
   const [lateCutoff, setLateCutoff] = useState('')
   const [showLatePolicy, setShowLatePolicy] = useState(false)
+  const [publishDate, setPublishDate] = useState('')
+  const [showScheduling, setShowScheduling] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -75,6 +77,12 @@ export default function EditAssignmentPage() {
           const pad = (n: number) => String(n).padStart(2, '0')
           setLateCutoff(`${c.getFullYear()}-${pad(c.getMonth() + 1)}-${pad(c.getDate())}T${pad(c.getHours())}:${pad(c.getMinutes())}`)
         }
+        const publishedAt = (data as any).publish_date
+        if (publishedAt) {
+          const p = new Date(publishedAt)
+          const pad = (n: number) => String(n).padStart(2, '0')
+          setPublishDate(`${p.getFullYear()}-${pad(p.getMonth() + 1)}-${pad(p.getDate())}T${pad(p.getHours())}:${pad(p.getMinutes())}`)
+        }
       })
       .catch(() => navigate('/assignments'))
       .finally(() => setFetching(false))
@@ -99,6 +107,7 @@ export default function EditAssignmentPage() {
         target_level: targetLevel || undefined,
         accept_late_submissions: acceptLate,
         late_cutoff: lateCutoff.trim() ? new Date(lateCutoff).toISOString() : '',
+        publish_date: publishDate.trim() ? new Date(publishDate).toISOString() : '',
       })
       navigate('/assignments')
     } catch (err: unknown) {
@@ -202,6 +211,24 @@ export default function EditAssignmentPage() {
                   </Select>
                 </div>
               </div>
+              <div className="border rounded-lg">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between p-3 text-sm font-medium"
+                  onClick={() => setShowScheduling(!showScheduling)}
+                >
+                  <span>Scheduling</span>
+                  {showScheduling ? <ChevronDown className="h-4 w-4" /> : <ChevronDown className="h-4 w-4 rotate-180" />}
+                </button>
+                {showScheduling && (
+                  <div className="border-t space-y-2 p-3">
+                    <Label htmlFor="publishDate">Publish Date <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input id="publishDate" type="datetime-local" value={publishDate} onChange={(e) => setPublishDate(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Leave empty to publish immediately. Students only see the assignment after this time.</p>
+                  </div>
+                )}
+              </div>
+
               <div className="border rounded-lg">
                 <button
                   type="button"

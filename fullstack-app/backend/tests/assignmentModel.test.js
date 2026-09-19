@@ -74,3 +74,19 @@ test('buildAssignmentUpdateQuery includes late-policy columns by default and omi
   const withoutPolicy = buildAssignmentUpdateQuery(true, true, true, false);
   assert.doesNotMatch(withoutPolicy, /accept_late_submissions|late_cutoff/);
 });
+
+test('buildAssignmentCreateQuery includes publish_date by default and omits when requested', () => {
+  const withPublish = buildAssignmentCreateQuery(true, true, true, true, true);
+  assert.match(withPublish, /publish_date/);
+
+  const withoutPublish = buildAssignmentCreateQuery(true, true, true, true, false);
+  assert.doesNotMatch(withoutPublish, /publish_date/);
+});
+
+test('buildAssignmentUpdateQuery includes publish_date by default and omits when requested', () => {
+  const withPublish = buildAssignmentUpdateQuery(true, true, true, true, true);
+  assert.match(withPublish, /publish_date = @publishDate/);
+
+  const withoutPublish = buildAssignmentUpdateQuery(true, true, true, true, false);
+  assert.doesNotMatch(withoutPublish, /publish_date/);
+});
