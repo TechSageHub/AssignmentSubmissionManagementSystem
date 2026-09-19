@@ -5,6 +5,7 @@ import api, { readApiCache } from '@/services/api'
 import type { Assignment } from '@/types'
 import Layout from '@/components/Layout'
 import { Navigate, Link } from 'react-router-dom'
+import DeadlineTracker from '@/components/DeadlineTracker'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -296,6 +297,8 @@ export default function DashboardPage() {
     { title: 'Overdue', value: stats.overdueCount ?? 0, icon: AlertCircle, color: 'text-red-600 bg-red-50' },
   ]
 
+  const submittedIds = new Set(submissions.map((s: { assignment_id: number }) => s.assignment_id))
+
   return (
     <Layout>
       <div className="mb-8">
@@ -330,6 +333,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <DeadlineTracker assignments={assignments} submittedAssignmentIds={submittedIds} loading={loading} />
+
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
@@ -349,31 +354,6 @@ export default function DashboardPage() {
             </Link>
           </CardContent>
         </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Deadlines</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-8 rounded" />)}</div>
-              ) : assignments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No upcoming deadlines.</p>
-              ) : (
-                <div className="space-y-2">
-                  {assignments
-                    .filter((a: any) => new Date(a.due_date) >= new Date())
-                    .slice(0, 5)
-                    .map((a: any) => (
-                    <Link key={a.id} to={`/assignments/${a.id}`} className="flex items-center justify-between rounded-lg p-2 text-sm hover:bg-muted/50 transition-colors">
-                      <span className="font-medium truncate">{a.title}</span>
-                      <span className="text-xs text-muted-foreground shrink-0 ml-2">{new Date(a.due_date).toLocaleDateString()}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
       </div>
     </Layout>
   )
