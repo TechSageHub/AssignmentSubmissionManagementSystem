@@ -38,3 +38,21 @@ test('isMissingColumnError detects missing-column errors', () => {
   assert.equal(isMissingColumnError(new Error("Invalid column name 'target_level'"), 'target_level'), true);
   assert.equal(isMissingColumnError(new Error('some other database error'), 'course_code'), false);
 });
+
+test('buildAssignmentCreateQuery includes course_id and semester by default and omits when requested', () => {
+  const withLink = buildAssignmentCreateQuery(true, true, true);
+  assert.match(withLink, /course_id/);
+  assert.match(withLink, /semester/);
+
+  const withoutLink = buildAssignmentCreateQuery(true, true, false);
+  assert.doesNotMatch(withoutLink, /course_id|semester/);
+});
+
+test('buildAssignmentUpdateQuery includes course_id and semester by default and omits when requested', () => {
+  const withLink = buildAssignmentUpdateQuery(true, true, true);
+  assert.match(withLink, /course_id = @courseId/);
+  assert.match(withLink, /semester = @semester/);
+
+  const withoutLink = buildAssignmentUpdateQuery(true, true, false);
+  assert.doesNotMatch(withoutLink, /course_id|semester/);
+});

@@ -133,6 +133,9 @@ export default function AssignmentDetailPage() {
                     {(assignment as any).course_title && (
                       <span>{(assignment as any).course_title}</span>
                     )}
+                    {(assignment as any).semester && (
+                      <span className="text-muted-foreground">{(assignment as any).semester}</span>
+                    )}
                     <span className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
                       Due {new Date(assignment.due_date).toLocaleString()}

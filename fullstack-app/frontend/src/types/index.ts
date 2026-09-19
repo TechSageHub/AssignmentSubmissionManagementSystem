@@ -48,6 +48,15 @@ export interface CreateUserData {
   levelScope?: string
 }
 
+export interface Course {
+  id: number
+  code: string
+  title: string
+  department?: string
+  created_at?: string
+  assignment_count?: number
+}
+
 export interface Assignment {
   id: number
   lecturer_id: number
@@ -57,6 +66,8 @@ export interface Assignment {
   file_path: string | null
   course_code?: string
   course_title?: string
+  course_id?: number | null
+  semester?: string
   target_level?: string
   created_at: string
   updated_at: string
@@ -68,6 +79,8 @@ export interface CreateAssignmentData {
   due_date: string
   course_code?: string
   course_title?: string
+  course_id?: number
+  semester?: string
   target_level?: string
 }
 

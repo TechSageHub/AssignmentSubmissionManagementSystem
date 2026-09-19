@@ -18,6 +18,7 @@ const migrations = dbType === 'postgres'
       'migration_011_submissions_unique_fk.postgres.sql',
       'migration_012_add_storage_blobs.postgres.sql',
       'migration_013_add_target_level_and_lecturer_scope.postgres.sql',
+      'migration_014_add_courses.postgres.sql',
     ]
   : [
       'migration_001_add_verification.sql',
@@ -33,6 +34,7 @@ const migrations = dbType === 'postgres'
       'migration_011_submissions_unique_fk.sql',
       'migration_012_add_storage_blobs.sql',
       'migration_013_add_target_level_and_lecturer_scope.sql',
+      'migration_014_add_courses.sql',
     ];
 
 function splitStatements(sql) {

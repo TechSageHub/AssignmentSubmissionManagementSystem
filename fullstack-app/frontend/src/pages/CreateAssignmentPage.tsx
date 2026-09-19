@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
+import type { Course } from '@/types'
 import Layout from '@/components/Layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,14 +22,22 @@ export default function CreateAssignmentPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [courses, setCourses] = useState<Course[]>([])
+  const [courseChoice, setCourseChoice] = useState('')
+  const [showManualCourse, setShowManualCourse] = useState(false)
   const [courseCode, setCourseCode] = useState('')
   const [courseTitle, setCourseTitle] = useState('')
+  const [semester, setSemester] = useState('')
   const [targetLevel, setTargetLevel] = useState<string>(availableLevels[0] || 'All Levels')
   const [criteria, setCriteria] = useState<{ name: string; maxScore: number }[]>([])
   const [showRubric, setShowRubric] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    api.get('/courses').then(({ data }) => setCourses(data)).catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -37,12 +46,16 @@ export default function CreateAssignmentPage() {
     if (!dueDate) { setError('Due date is required'); return }
     setLoading(true)
     try {
+      const isManual = courseChoice === 'MANUAL'
+      const isCourse = courseChoice && courseChoice !== 'MANUAL'
       const { data } = await api.post('/assignments', {
         title: title.trim(),
         description,
         due_date: new Date(dueDate).toISOString(),
-        course_code: courseCode.trim() || undefined,
-        course_title: courseTitle.trim() || undefined,
+        course_id: isCourse ? Number(courseChoice) : undefined,
+        course_code: isManual ? courseCode.trim() || null : undefined,
+        course_title: isManual ? courseTitle.trim() || null : undefined,
+        semester: semester.trim() || undefined,
         target_level: targetLevel || undefined,
       })
       if (criteria.length > 0) {
@@ -86,15 +99,39 @@ export default function CreateAssignmentPage() {
                 <Label htmlFor="title">Title</Label>
                 <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Midterm Essay" required />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="courseCode">Course Code <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                  <Input id="courseCode" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="e.g. COM 411" />
+              <div className="space-y-2">
+                <Label htmlFor="course">Course <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Select
+                  value={courseChoice}
+                  onValueChange={(v) => {
+                    setCourseChoice(v)
+                    setShowManualCourse(v === 'MANUAL')
+                  }}
+                >
+                  <SelectTrigger id="course"><SelectValue placeholder="Select a course" /></SelectTrigger>
+                  <SelectContent>
+                    {courses.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.code} · {c.title}</SelectItem>
+                    ))}
+                    <SelectItem value="MANUAL">Not listed — enter details manually</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {showManualCourse && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="courseCode">Course Code <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input id="courseCode" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="e.g. COM 411" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="courseTitle">Course Title <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input id="courseTitle" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} placeholder="e.g. Software Engineering" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="courseTitle">Course Title <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                  <Input id="courseTitle" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} placeholder="e.g. Software Engineering" />
-                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="semester">Semester / Session <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input id="semester" value={semester} onChange={(e) => setSemester(e.target.value)} placeholder="e.g. 2024/2025 · 1st Sem" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>

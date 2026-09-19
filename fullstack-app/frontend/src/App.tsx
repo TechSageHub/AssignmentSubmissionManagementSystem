@@ -25,6 +25,7 @@ const GradeSubmissionPage = lazy(() => import('@/pages/GradeSubmissionPage'))
 const ViewSubmissionPage = lazy(() => import('@/pages/ViewSubmissionPage'))
 const AdminDashboardPage = lazy(() => import('@/pages/AdminDashboardPage'))
 const UserManagementPage = lazy(() => import('@/pages/UserManagementPage'))
+const CourseManagementPage = lazy(() => import('@/pages/CourseManagementPage'))
 const LecturerStudentsPage = lazy(() => import('@/pages/LecturerStudentsPage'))
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
 
@@ -73,6 +74,9 @@ function AppContent() {
       } />
       <Route path="/admin/users" element={
         <ProtectedRoute><AdminRoute><UserManagementPage /></AdminRoute></ProtectedRoute>
+      } />
+      <Route path="/admin/courses" element={
+        <ProtectedRoute><AdminRoute><CourseManagementPage /></AdminRoute></ProtectedRoute>
       } />
 
       <Route path="/students" element={

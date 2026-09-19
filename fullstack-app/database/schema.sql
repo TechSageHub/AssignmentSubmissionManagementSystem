@@ -43,6 +43,19 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_email' AND objec
     CREATE INDEX IX_Users_email ON Users(email);
 GO
 
+-- ================= Courses =================
+IF OBJECT_ID('dbo.Courses', 'U') IS NULL
+BEGIN
+    CREATE TABLE Courses (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        code NVARCHAR(20) NOT NULL UNIQUE,
+        title NVARCHAR(200) NOT NULL,
+        department NVARCHAR(100),
+        created_at DATETIME2 DEFAULT GETDATE()
+    );
+END
+GO
+
 -- ================= Assignments =================
 IF OBJECT_ID('dbo.Assignments', 'U') IS NULL
 BEGIN
@@ -55,16 +68,36 @@ BEGIN
         file_path NVARCHAR(500),
         course_code NVARCHAR(20),
         course_title NVARCHAR(200),
+        course_id INT,
+        semester NVARCHAR(50),
         target_level NVARCHAR(50),
         created_at DATETIME2 DEFAULT GETDATE(),
         updated_at DATETIME2 DEFAULT GETDATE(),
-        CONSTRAINT FK_Assignments_Lecturer FOREIGN KEY (lecturer_id) REFERENCES Users(id)
+        CONSTRAINT FK_Assignments_Lecturer FOREIGN KEY (lecturer_id) REFERENCES Users(id),
+        CONSTRAINT FK_Assignments_Course FOREIGN KEY (course_id) REFERENCES Courses(id) ON DELETE SET NULL
     );
 END
 GO
 
+IF COL_LENGTH('dbo.Assignments', 'course_id') IS NULL
+    ALTER TABLE Assignments ADD course_id INT NULL;
+GO
+
+IF COL_LENGTH('dbo.Assignments', 'semester') IS NULL
+    ALTER TABLE Assignments ADD semester NVARCHAR(50) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Assignments_Course')
+    ALTER TABLE Assignments ADD CONSTRAINT FK_Assignments_Course
+        FOREIGN KEY (course_id) REFERENCES Courses(id) ON DELETE SET NULL;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Assignments_lecturer_id' AND object_id = OBJECT_ID('Assignments'))
     CREATE INDEX IX_Assignments_lecturer_id ON Assignments(lecturer_id);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Assignments_course_id' AND object_id = OBJECT_ID('Assignments'))
+    CREATE INDEX IX_Assignments_course_id ON Assignments(course_id);
 GO
 
 -- ================= Submissions =================

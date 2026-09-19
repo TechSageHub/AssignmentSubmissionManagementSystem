@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS Users (
 
 CREATE INDEX IF NOT EXISTS IX_Users_email ON Users(email);
 
+CREATE TABLE IF NOT EXISTS Courses (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    title VARCHAR(200) NOT NULL,
+    department VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS Assignments (
     id SERIAL PRIMARY KEY,
     lecturer_id INT NOT NULL REFERENCES Users(id),
@@ -35,12 +43,18 @@ CREATE TABLE IF NOT EXISTS Assignments (
     file_path VARCHAR(500),
     course_code VARCHAR(20),
     course_title VARCHAR(200),
+    course_id INT REFERENCES Courses(id) ON DELETE SET NULL,
+    semester VARCHAR(50),
     target_level VARCHAR(50),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE Assignments ADD COLUMN IF NOT EXISTS course_id INT REFERENCES Courses(id) ON DELETE SET NULL;
+ALTER TABLE Assignments ADD COLUMN IF NOT EXISTS semester VARCHAR(50);
+
 CREATE INDEX IF NOT EXISTS IX_Assignments_lecturer_id ON Assignments(lecturer_id);
+CREATE INDEX IF NOT EXISTS IX_Assignments_course_id ON Assignments(course_id);
 
 CREATE TABLE IF NOT EXISTS Submissions (
     id SERIAL PRIMARY KEY,

@@ -1,4 +1,5 @@
 const assignmentModel = require('../models/assignment');
+const courseModel = require('../models/course');
 const userModel = require('../models/user');
 const { sendAssignmentCreated } = require('../utils/emailHelper');
 const { notifyAssignmentCreated } = require('../utils/notificationHelper');
@@ -13,9 +14,29 @@ function withUtcDueDate(row) {
   return row;
 }
 
+// When a course_id is supplied, backfill course_code/course_title from the
+// catalog so legacy display columns stay in sync. Throws 400 if the course
+// does not exist.
+async function resolveCourseFields({ courseId, courseCode, courseTitle }) {
+  if (courseId == null) {
+    return { courseId: null, courseCode, courseTitle };
+  }
+  const course = await courseModel.findById(courseId);
+  if (!course) {
+    const err = new Error('Course not found');
+    err.status = 400;
+    throw err;
+  }
+  return {
+    courseId: course.id,
+    courseCode: course.code,
+    courseTitle: course.title,
+  };
+}
+
 async function createAssignment(req, res, next) {
   try {
-    const { title, description, due_date, course_code, course_title, target_level } = req.body;
+    const { title, description, due_date, course_code, course_title, course_id, semester, target_level } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
@@ -45,13 +66,15 @@ async function createAssignment(req, res, next) {
       return res.status(400).json({ error: 'ValidationError', details: 'Due date must be in the future' });
     }
 
+    const courseFields = await resolveCourseFields({ courseId: course_id, courseCode: course_code, courseTitle: course_title });
+
     const assignment = await assignmentModel.create({
       lecturerId: req.user.id,
       title: title.trim(),
       description: description || null,
       dueDate: toStoredUtc(dueDateTime),
-      courseCode: course_code || null,
-      courseTitle: course_title || null,
+      ...courseFields,
+      semester: semester || null,
       targetLevel: target_level || null,
     });
 
@@ -118,7 +141,7 @@ async function updateAssignment(req, res, next) {
       return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
     }
 
-    const { title, description, due_date, course_code, course_title, target_level } = req.body;
+    const { title, description, due_date, course_code, course_title, course_id, semester, target_level } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
     }
@@ -146,12 +169,18 @@ async function updateAssignment(req, res, next) {
       dueDate = toStoredUtc(assignment.due_date);
     }
 
+    const courseFields = await resolveCourseFields({
+      courseId: course_id !== undefined ? course_id : assignment.course_id,
+      courseCode: course_code !== undefined ? course_code : assignment.course_code,
+      courseTitle: course_title !== undefined ? course_title : assignment.course_title,
+    });
+
     const updated = await assignmentModel.update(assignmentId, {
       title: title.trim(),
       description: description || null,
       dueDate,
-      courseCode: course_code !== undefined ? course_code : assignment.course_code,
-      courseTitle: course_title !== undefined ? course_title : assignment.course_title,
+      ...courseFields,
+      semester: semester !== undefined ? semester : assignment.semester,
       targetLevel: target_level !== undefined ? target_level : assignment.target_level,
     });
 

@@ -114,6 +114,9 @@ export default function AssignmentsListPage() {
                       {(a as any).course_code && (
                         <span className="font-medium text-indigo-500">{(a as any).course_code}</span>
                       )}
+                      {(a as any).semester && (
+                        <span>{(a as any).semester}</span>
+                      )}
                       {a.target_level && (
                         <Badge variant="outline" className="text-xs font-normal">
                           {a.target_level}
