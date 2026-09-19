@@ -16,7 +16,7 @@ interface Student {
   email: string
 }
 
-const TEMPLATE_HEADERS = ['name', 'email', 'password', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
+const TEMPLATE_HEADERS = ['name', 'email', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
 
 export default function LecturerStudentsPage() {
   usePageTitle('Students')
@@ -52,7 +52,6 @@ export default function LecturerStudentsPage() {
     const sampleRow = [
       'John Doe',
       'john.doe@fpi.edu.ng',
-      'ChangeMe123',
       'student',
       'ND/ICT/2024/0001',
       '',

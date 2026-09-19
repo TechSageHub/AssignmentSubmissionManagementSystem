@@ -28,7 +28,6 @@ interface CreateUserDialogProps {
 export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onCreated }: CreateUserDialogProps) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>(allowedRoles[0])
   const [studentId, setStudentId] = useState('')
   const [staffId, setStaffId] = useState('')
@@ -43,7 +42,7 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
   const effectiveDepartment = selectedDept === 'OTHER' ? customDept.trim() : selectedDept
 
   const reset = () => {
-    setName(''); setEmail(''); setPassword(''); setRole(allowedRoles[0])
+    setName(''); setEmail(''); setRole(allowedRoles[0])
     setStudentId(''); setStaffId(''); setSelectedDept(''); setCustomDept(''); setProgramme(''); setLevel(''); setLevelScope('both'); setPhone('')
   }
 
@@ -57,7 +56,7 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
     setLoading(true)
     try {
       await api.post('/users', {
-        name, email, password, role,
+        name, email, role,
         studentId: role === 'student' ? studentId : undefined,
         staffId: role === 'lecturer' ? staffId : undefined,
         department: effectiveDepartment || undefined,
@@ -66,7 +65,7 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
         levelScope: role === 'lecturer' ? levelScope : undefined,
         phone: phone || undefined,
       })
-      toast.success('Account created. A verification email has been sent to the user.')
+      toast.success('Account created. The user will receive a verification email with a temporary password.')
       reset()
       onOpenChange(false)
       onCreated?.()
@@ -99,10 +98,8 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
             <Input id="cu-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@fpi.edu.ng" required />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="cu-password">Temporary Password</Label>
-            <Input id="cu-password" type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" minLength={8} required />
-            <p className="text-xs text-muted-foreground">The user must change this on first login.</p>
+          <div className="rounded-md border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+            A temporary password is generated automatically and sent to the user&apos;s email. They will be asked to set their own password on first login.
           </div>
 
           {allowedRoles.length > 1 ? (

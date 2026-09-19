@@ -13,7 +13,7 @@ cd fullstack-app/backend && npm run dev
 cd fullstack-app/frontend && npm run dev
 # migrations (backend dir; idempotent schema + journaled migrations, fails loudly)
 cd fullstack-app/backend && npm run migrate
-# tests: Node builtin runner, from backend dir (npm test is a stub that errors)
+# tests: Node builtin runner, from backend dir (`npm test` === `node --test`)
 cd fullstack-app/backend && node --test
 # frontend tests: vitest (api cache layer), from frontend dir
 cd fullstack-app/frontend && npm test
@@ -21,7 +21,7 @@ cd fullstack-app/frontend && npm test
 cd fullstack-app/frontend && npm run build
 ```
 
-`npm run lint` (frontend) currently fails with ~45 pre-existing errors repo-wide (react-hooks set-state-in-effect, no-explicit-any). Don't treat it as a merge gate. Verify with `tsc`/`npm run build` instead.
+`npm run lint` (frontend) currently fails repo-wide on pre-existing errors (react-hooks set-state-in-effect, no-explicit-any). Don't treat it as a merge gate. Verify with `tsc`/`npm run build` instead.
 
 ## Layout
 
@@ -43,10 +43,16 @@ cd fullstack-app/frontend && npm run build
 - Bootstrapping an admin: seeded admin can't log in (placeholder hash). Run from backend dir:
   `$env:ADMIN_EMAIL="..."; $env:ADMIN_PASSWORD="..."; npm run create-admin`
   (idempotent; resets password/role if the email exists).
-- `migrate.js` is fail-loud: per-statement errors abort with exit 1. It records applied migration files in a `SchemaMigrations` journal table and skips already-applied ones; the schema files (mssql `schema.sql`, `schema.postgres.sql`) are authoritative + idempotent and re-run every time as the baseline. Postgres runs only `schema.postgres.sql` + the `*.postgres.sql` migrations (008 submission files, 009 reminder log); migrations 001-007 are T-SQL only (guarded so mssql re-runs are safe no-ops). New table/column changes go into the schema files AND new guarded migrations (an mssql one, plus a `*.postgres.sql` twin for PG).
+- `migrate.js` is fail-loud: per-statement errors abort with exit 1. It records applied migration files in a `SchemaMigrations` journal table and skips already-applied ones; the schema files (mssql `schema.sql`, `schema.postgres.sql`) are authoritative + idempotent and re-run every time as the baseline. Postgres runs only `schema.postgres.sql` + the `*.postgres.sql` migrations (008–013); migrations 001-007 are T-SQL only (the PG schema file covers those changes). New table/column changes go into the schema files AND new guarded migrations (an mssql one, plus a `*.postgres.sql` twin for PG).
 - Prod serves `frontend/dist` from the backend; uploads live at `backend/uploads/assignments/:id/` (gitignored) and are NEVER served statically — files stream only through the authorized `GET /api/submissions/:submissionId/file` endpoint, `/uploads/*` returns 404.
+- File storage (`services/storage.js`): when `S3_BUCKET` is set, files go to S3-compatible object storage; otherwise they persist in the `StorageBlobs` DB table (BYTEA/VARBINARY) with a best-effort dual-write to local `uploads/`. Multer uses memory storage — never read submissions from disk directly, go through the storage service.
 - Deploy: `render.yaml` blueprint (Postgres + web service). After deploy: run migrations in Render shell, then `create-admin`. Vercel skips cron/reminders (`VERCEL !== '1'` guard in `index.js`).
 
 ## Frontend data layer
 
 `src/services/api.ts` wraps axios with a 60s GET cache (`readApiCache`/`writeApiCache`); every mutation clears the whole cache; a 401 clears auth and redirects to `/login`. Use the cache helpers when adding list pages; do not add per-request caching on top.
+
+## API conventions
+
+- `GET /api/admin/users` is paginated + searchable (`?limit&offset&search`, limit capped at 200) and returns `{ items, total, limit, offset }` — not a bare array. New admin list endpoints should follow this shape.
+- Error responses are `{ error: <Name>, details: <message> }`; global handler in `index.js` caps details at 500 chars and hides 5xx messages in production.

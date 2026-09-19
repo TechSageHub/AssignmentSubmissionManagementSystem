@@ -3,6 +3,7 @@ const config = require('../config/env');
 const userModel = require('../models/user');
 const { sendEmail } = require('../config/email');
 const { escapeHtml } = require('../utils/html');
+const { generateTemporaryPassword } = require('../utils/password');
 const auditLog = require('../utils/auditLogger');
 
 const ALLOWED_ROLES = ['student', 'lecturer', 'admin'];
@@ -11,15 +12,18 @@ const ALLOWED_ROLES = ['student', 'lecturer', 'admin'];
 // `creatorRole` enforces authorization (lecturers may only create students).
 // Returns the created user record. Throws { status, details } on validation failure.
 async function provisionUser({ name, email, password, role, username, studentId, staffId, department, programme, level, phone, levelScope, level_scope }, creatorRole) {
-  if (!name || !email || !password || !role) {
-    throw { status: 400, details: 'Name, email, password and role are required' };
+  if (!name || !email || !role) {
+    throw { status: 400, details: 'Name, email and role are required' };
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw { status: 400, details: 'Invalid email format' };
   }
-  if (password.length < 8) {
+  if (password && password.length < 8) {
     throw { status: 400, details: 'Password must be at least 8 characters' };
   }
+  // Passwords are auto-generated unless one is explicitly supplied (backwards
+  // compatible with CSV files that still carry a password column).
+  const temporaryPassword = password || generateTemporaryPassword();
   if (!ALLOWED_ROLES.includes(role)) {
     throw { status: 400, details: 'Role must be student, lecturer, or admin' };
   }
@@ -38,7 +42,7 @@ async function provisionUser({ name, email, password, role, username, studentId,
     }
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(temporaryPassword, 10);
   const user = await userModel.createUser({
     name, email, passwordHash, role, username,
     studentId: role === 'student' ? studentId : null,
@@ -59,7 +63,7 @@ async function provisionUser({ name, email, password, role, username, studentId,
 
 An account has been created for you on the FPI Assignment Submission System.
 
-Temporary Password: ${password}
+Temporary Password: ${temporaryPassword}
 
 Please verify your email by visiting this link: ${verifyUrl}
 This link expires in 24 hours.
@@ -68,7 +72,7 @@ After verification, you will be asked to set your own password on first login.
 `,
       html: `<p>Hi ${escapeHtml(name)},</p>
         <p>An account has been created for you on the FPI Assignment Submission System.</p>
-        <p><strong>Temporary password:</strong> ${escapeHtml(password)}</p>
+        <p><strong>Temporary password:</strong> ${escapeHtml(temporaryPassword)}</p>
         <p>Click <a href="${verifyUrl}">here</a> to verify your email. This link expires in 24 hours.</p>
         <p>After verification, you will be asked to set your own password on first login.</p>`,
     });

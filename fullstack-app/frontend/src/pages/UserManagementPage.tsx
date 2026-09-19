@@ -28,7 +28,7 @@ interface UserPageResponse {
   offset: number
 }
 
-const TEMPLATE_HEADERS = ['name', 'email', 'password', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
+const TEMPLATE_HEADERS = ['name', 'email', 'role', 'studentId', 'staffId', 'department', 'programme', 'level', 'phone']
 const PAGE_SIZE = 20
 
 function buildPageNumbers(current: number, last: number): (number | '...')[] {
@@ -99,7 +99,6 @@ export default function UserManagementPage() {
     const sampleRow = [
       'John Doe',
       'john.doe@fpi.edu.ng',
-      'ChangeMe123',
       'student',
       'ND/ICT/2024/0001',
       '',
@@ -221,9 +220,9 @@ export default function UserManagementPage() {
             Upload a CSV file with a header row and one row per user. The template button downloads the exact format expected by the system.
           </p>
           <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-            <li><strong>Headers required:</strong> name, email, password, role, studentId, staffId, department, programme, level, phone.</li>
+            <li><strong>Headers required:</strong> name, email, role, studentId, staffId, department, programme, level, phone.</li>
             <li><strong>Role values:</strong> student, lecturer, admin.</li>
-            <li><strong>Password:</strong> temporary password for the user to log in and change later.</li>
+            <li><strong>Password:</strong> generated automatically — each user receives their temporary password by email.</li>
             <li><strong>Optional fields:</strong> studentId, staffId, department, programme, level, phone.</li>
           </ul>
           <p className="text-sm text-muted-foreground">
