@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import RubricBuilder from '@/components/RubricBuilder'
 import { getTargetLevels } from '@/constants/academic'
 
@@ -29,8 +30,11 @@ export default function CreateAssignmentPage() {
   const [courseTitle, setCourseTitle] = useState('')
   const [semester, setSemester] = useState('')
   const [targetLevel, setTargetLevel] = useState<string>(availableLevels[0] || 'All Levels')
+  const [acceptLate, setAcceptLate] = useState(true)
+  const [lateCutoff, setLateCutoff] = useState('')
   const [criteria, setCriteria] = useState<{ name: string; maxScore: number }[]>([])
   const [showRubric, setShowRubric] = useState(false)
+  const [showLatePolicy, setShowLatePolicy] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -57,6 +61,8 @@ export default function CreateAssignmentPage() {
         course_title: isManual ? courseTitle.trim() || null : undefined,
         semester: semester.trim() || undefined,
         target_level: targetLevel || undefined,
+        accept_late_submissions: acceptLate,
+        late_cutoff: lateCutoff.trim() ? new Date(lateCutoff).toISOString() : null,
       })
       if (criteria.length > 0) {
         await api.put(`/assignments/${data.id}/rubric`, { criteria })
@@ -167,6 +173,35 @@ export default function CreateAssignmentPage() {
                 {showRubric && (
                   <div className="border-t p-3">
                     <RubricBuilder criteria={criteria} onChange={setCriteria} />
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-lg">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between p-3 text-sm font-medium"
+                  onClick={() => setShowLatePolicy(!showLatePolicy)}
+                >
+                  <span>Submission Policy</span>
+                  {showLatePolicy ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                {showLatePolicy && (
+                  <div className="border-t space-y-4 p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Accept late submissions</p>
+                        <p className="text-xs text-muted-foreground">Allow submissions after the due date</p>
+                      </div>
+                      <Switch checked={acceptLate} onCheckedChange={setAcceptLate} />
+                    </div>
+                    {acceptLate && (
+                      <div className="space-y-2">
+                        <Label htmlFor="lateCutoff">Late Submission Cutoff <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                        <Input id="lateCutoff" type="datetime-local" value={lateCutoff} onChange={(e) => setLateCutoff(e.target.value)} />
+                        <p className="text-xs text-muted-foreground">Leave empty to accept late submissions indefinitely.</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

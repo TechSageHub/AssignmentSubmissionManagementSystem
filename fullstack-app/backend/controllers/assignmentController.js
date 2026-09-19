@@ -11,7 +11,14 @@ function withUtcDueDate(row) {
   if (row && row.due_date != null) {
     row.due_date = toIsoUtc(row.due_date);
   }
+  if (row && row.late_cutoff != null) {
+    row.late_cutoff = toIsoUtc(row.late_cutoff);
+  }
   return row;
+}
+
+function toBit(value) {
+  return value === false || value === 'false' || value === 0 ? 0 : 1;
 }
 
 // When a course_id is supplied, backfill course_code/course_title from the
@@ -36,7 +43,7 @@ async function resolveCourseFields({ courseId, courseCode, courseTitle }) {
 
 async function createAssignment(req, res, next) {
   try {
-    const { title, description, due_date, course_code, course_title, course_id, semester, target_level } = req.body;
+    const { title, description, due_date, course_code, course_title, course_id, semester, target_level, accept_late_submissions, late_cutoff } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
@@ -68,6 +75,18 @@ async function createAssignment(req, res, next) {
 
     const courseFields = await resolveCourseFields({ courseId: course_id, courseCode: course_code, courseTitle: course_title });
 
+    let lateCutoff = null;
+    if (late_cutoff) {
+      const parsedCutoff = parseInputDate(late_cutoff);
+      if (!parsedCutoff) {
+        return res.status(400).json({ error: 'ValidationError', details: 'Late submission cutoff must be a valid date and time' });
+      }
+      if (parsedCutoff <= dueDateTime) {
+        return res.status(400).json({ error: 'ValidationError', details: 'Late submission cutoff must be after the due date' });
+      }
+      lateCutoff = toStoredUtc(parsedCutoff);
+    }
+
     const assignment = await assignmentModel.create({
       lecturerId: req.user.id,
       title: title.trim(),
@@ -76,6 +95,8 @@ async function createAssignment(req, res, next) {
       ...courseFields,
       semester: semester || null,
       targetLevel: target_level || null,
+      acceptLateSubmissions: toBit(accept_late_submissions),
+      lateCutoff,
     });
 
     // Notify students matching lecturer's department and target level
@@ -141,7 +162,7 @@ async function updateAssignment(req, res, next) {
       return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
     }
 
-    const { title, description, due_date, course_code, course_title, course_id, semester, target_level } = req.body;
+    const { title, description, due_date, course_code, course_title, course_id, semester, target_level, accept_late_submissions, late_cutoff } = req.body;
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'ValidationError', details: 'Title is required' });
     }
@@ -169,6 +190,29 @@ async function updateAssignment(req, res, next) {
       dueDate = toStoredUtc(assignment.due_date);
     }
 
+    // Keep existing late policy unless a new value is supplied. An empty string
+    // clears the cutoff; an explicit value must land after the due date.
+    let acceptLate = toBit(assignment.accept_late_submissions);
+    if (accept_late_submissions !== undefined) {
+      acceptLate = toBit(accept_late_submissions);
+    }
+
+    let lateCutoff = assignment.late_cutoff != null ? toStoredUtc(assignment.late_cutoff) : null;
+    if (late_cutoff !== undefined) {
+      if (late_cutoff === null || late_cutoff === '') {
+        lateCutoff = null;
+      } else {
+        const parsedCutoff = parseInputDate(late_cutoff);
+        if (!parsedCutoff) {
+          return res.status(400).json({ error: 'ValidationError', details: 'Late submission cutoff must be a valid date and time' });
+        }
+        if (parsedCutoff <= parseInputDate(dueDate)) {
+          return res.status(400).json({ error: 'ValidationError', details: 'Late submission cutoff must be after the due date' });
+        }
+        lateCutoff = toStoredUtc(parsedCutoff);
+      }
+    }
+
     const courseFields = await resolveCourseFields({
       courseId: course_id !== undefined ? course_id : assignment.course_id,
       courseCode: course_code !== undefined ? course_code : assignment.course_code,
@@ -182,6 +226,8 @@ async function updateAssignment(req, res, next) {
       ...courseFields,
       semester: semester !== undefined ? semester : assignment.semester,
       targetLevel: target_level !== undefined ? target_level : assignment.target_level,
+      acceptLateSubmissions: acceptLate,
+      lateCutoff,
     });
 
     res.json(withUtcDueDate(updated));

@@ -56,3 +56,21 @@ test('buildAssignmentUpdateQuery includes course_id and semester by default and 
   const withoutLink = buildAssignmentUpdateQuery(true, true, false);
   assert.doesNotMatch(withoutLink, /course_id|semester/);
 });
+
+test('buildAssignmentCreateQuery includes late-policy columns by default and omits when requested', () => {
+  const withPolicy = buildAssignmentCreateQuery(true, true, true, true);
+  assert.match(withPolicy, /accept_late_submissions/);
+  assert.match(withPolicy, /late_cutoff/);
+
+  const withoutPolicy = buildAssignmentCreateQuery(true, true, true, false);
+  assert.doesNotMatch(withoutPolicy, /accept_late_submissions|late_cutoff/);
+});
+
+test('buildAssignmentUpdateQuery includes late-policy columns by default and omits when requested', () => {
+  const withPolicy = buildAssignmentUpdateQuery(true, true, true, true);
+  assert.match(withPolicy, /accept_late_submissions = @acceptLateSubmissions/);
+  assert.match(withPolicy, /late_cutoff = @lateCutoff/);
+
+  const withoutPolicy = buildAssignmentUpdateQuery(true, true, true, false);
+  assert.doesNotMatch(withoutPolicy, /accept_late_submissions|late_cutoff/);
+});

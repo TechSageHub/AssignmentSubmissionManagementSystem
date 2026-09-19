@@ -12,8 +12,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ChevronDown } from 'lucide-react'
 import { getTargetLevels } from '@/constants/academic'
+import { Switch } from '@/components/ui/switch'
 
 export default function EditAssignmentPage() {
   usePageTitle('Edit Assignment')
@@ -31,6 +32,9 @@ export default function EditAssignmentPage() {
   const [courseTitle, setCourseTitle] = useState('')
   const [semester, setSemester] = useState('')
   const [targetLevel, setTargetLevel] = useState<string>('All Levels')
+  const [acceptLate, setAcceptLate] = useState(true)
+  const [lateCutoff, setLateCutoff] = useState('')
+  const [showLatePolicy, setShowLatePolicy] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -64,6 +68,13 @@ export default function EditAssignmentPage() {
         }
         setCourseCode((data as any).course_code || '')
         setCourseTitle((data as any).course_title || '')
+        setAcceptLate((data as any).accept_late_submissions !== false)
+        const cutoff = (data as any).late_cutoff
+        if (cutoff) {
+          const c = new Date(cutoff)
+          const pad = (n: number) => String(n).padStart(2, '0')
+          setLateCutoff(`${c.getFullYear()}-${pad(c.getMonth() + 1)}-${pad(c.getDate())}T${pad(c.getHours())}:${pad(c.getMinutes())}`)
+        }
       })
       .catch(() => navigate('/assignments'))
       .finally(() => setFetching(false))
@@ -86,6 +97,8 @@ export default function EditAssignmentPage() {
         course_title: isManual ? courseTitle.trim() || null : undefined,
         semester: semester.trim() || undefined,
         target_level: targetLevel || undefined,
+        accept_late_submissions: acceptLate,
+        late_cutoff: lateCutoff.trim() ? new Date(lateCutoff).toISOString() : '',
       })
       navigate('/assignments')
     } catch (err: unknown) {
@@ -189,6 +202,35 @@ export default function EditAssignmentPage() {
                   </Select>
                 </div>
               </div>
+              <div className="border rounded-lg">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between p-3 text-sm font-medium"
+                  onClick={() => setShowLatePolicy(!showLatePolicy)}
+                >
+                  <span>Submission Policy</span>
+                  {showLatePolicy ? <ChevronDown className="h-4 w-4" /> : <ChevronDown className="h-4 w-4 rotate-180" />}
+                </button>
+                {showLatePolicy && (
+                  <div className="border-t space-y-4 p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Accept late submissions</p>
+                        <p className="text-xs text-muted-foreground">Allow submissions after the due date</p>
+                      </div>
+                      <Switch checked={acceptLate} onCheckedChange={setAcceptLate} />
+                    </div>
+                    {acceptLate && (
+                      <div className="space-y-2">
+                        <Label htmlFor="lateCutoff">Late Submission Cutoff <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                        <Input id="lateCutoff" type="datetime-local" value={lateCutoff} onChange={(e) => setLateCutoff(e.target.value)} />
+                        <p className="text-xs text-muted-foreground">Leave empty to accept late submissions indefinitely.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <Button type="submit" pending={loading}>
                   {loading ? 'Saving...' : 'Save Changes'}

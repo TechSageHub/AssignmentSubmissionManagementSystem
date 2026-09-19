@@ -44,6 +44,13 @@ async function submitAssignment(req, res, next) {
 
     const isLate = new Date() > parseInputDate(assignment.due_date);
 
+    if (isLate && !assignment.accept_late_submissions) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Late submissions are not accepted for this assignment' });
+    }
+    if (isLate && assignment.late_cutoff != null && new Date() > parseInputDate(assignment.late_cutoff)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'The late submission window for this assignment has closed' });
+    }
+
     // Validate proposed group members: real, active students who have not already
     // submitted this assignment. Invalid ids are silently dropped.
     let groupMemberIds = [];

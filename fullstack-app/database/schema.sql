@@ -71,6 +71,8 @@ BEGIN
         course_id INT,
         semester NVARCHAR(50),
         target_level NVARCHAR(50),
+        accept_late_submissions BIT NOT NULL DEFAULT 1,
+        late_cutoff DATETIME2,
         created_at DATETIME2 DEFAULT GETDATE(),
         updated_at DATETIME2 DEFAULT GETDATE(),
         CONSTRAINT FK_Assignments_Lecturer FOREIGN KEY (lecturer_id) REFERENCES Users(id),
@@ -85,6 +87,14 @@ GO
 
 IF COL_LENGTH('dbo.Assignments', 'semester') IS NULL
     ALTER TABLE Assignments ADD semester NVARCHAR(50) NULL;
+GO
+
+IF COL_LENGTH('dbo.Assignments', 'accept_late_submissions') IS NULL
+    ALTER TABLE Assignments ADD accept_late_submissions BIT NOT NULL DEFAULT 1;
+GO
+
+IF COL_LENGTH('dbo.Assignments', 'late_cutoff') IS NULL
+    ALTER TABLE Assignments ADD late_cutoff DATETIME2 NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Assignments_Course')

@@ -110,7 +110,11 @@ export default function AssignmentDetailPage() {
   }
   if (!assignment) return null
 
-  const isOverdue = new Date() > new Date(assignment.due_date)
+  const now = new Date()
+  const isOverdue = now > new Date(assignment.due_date)
+  const acceptLate = assignment.accept_late_submissions !== false
+  const lateCutoff = assignment.late_cutoff ? new Date(assignment.late_cutoff) : null
+  const submissionsClosed = Boolean(isOverdue && (!acceptLate || (!!lateCutoff && now > lateCutoff)))
 
   return (
     <Layout>
@@ -169,6 +173,16 @@ export default function AssignmentDetailPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {submissionsClosed && (
+                    <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>
+                        {!acceptLate
+                          ? 'Late submissions are not accepted for this assignment.'
+                          : 'The late submission window for this assignment has closed.'}
+                      </span>
+                    </div>
+                  )}
                   <div
                     className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 p-6 text-center transition-colors hover:border-primary/50 cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
@@ -262,7 +276,7 @@ export default function AssignmentDetailPage() {
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={submitting || files.length === 0}>
+                  <Button type="submit" className="w-full" disabled={submitting || files.length === 0 || submissionsClosed}>
                     {submitting ? 'Uploading...' : 'Submit'}
                   </Button>
                 </form>
