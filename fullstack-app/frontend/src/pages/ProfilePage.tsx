@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { ErrorState } from '@/components/PageState'
-import { User, Mail, Hash, BadgeCheck, Save } from 'lucide-react'
+import { User, Mail, Hash, BadgeCheck, Save, PenLine } from 'lucide-react'
 import { toast } from 'sonner'
 import { DEPARTMENTS, STUDENT_LEVELS, LECTURER_LEVEL_SCOPES } from '@/constants/academic'
 
@@ -27,26 +27,41 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   const effectiveDepartment = selectedDept === 'OTHER' ? customDept.trim() : selectedDept
 
+  const populateProfile = (data: any) => {
+    const dept = data.department || ''
+    if (DEPARTMENTS.includes(dept)) {
+      setSelectedDept(dept)
+    } else if (dept) {
+      setSelectedDept('OTHER')
+      setCustomDept(dept)
+    }
+    setProgramme(data.programme || '')
+    setLevel(data.level || '')
+    setLevelScope(data.level_scope || data.levelScope || 'both')
+    setPhone(data.phone || '')
+  }
+
+  const loadProfile = () => {
+    api.get('/auth/me').then(({ data }) => {
+      populateProfile(data)
+    }).catch(() => setLoadError(true)).finally(() => setLoading(false))
+  }
+
   useEffect(() => {
     if (user && token) {
-      api.get('/auth/me').then(({ data }) => {
-        const dept = (data as any).department || ''
-        if (DEPARTMENTS.includes(dept as any)) {
-          setSelectedDept(dept)
-        } else if (dept) {
-          setSelectedDept('OTHER')
-          setCustomDept(dept)
-        }
-        setProgramme((data as any).programme || '')
-        setLevel((data as any).level || '')
-        setLevelScope((data as any).level_scope || (data as any).levelScope || 'both')
-        setPhone((data as any).phone || '')
-      }).catch(() => setLoadError(true)).finally(() => setLoading(false))
+      loadProfile()
     }
   }, [user, token])
+
+  const cancelEdit = () => {
+    setIsEditing(false)
+    setLoadError(false)
+    api.get('/auth/me').then(({ data }) => populateProfile(data)).catch(() => setLoadError(true))
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -61,6 +76,7 @@ export default function ProfilePage() {
       })
       toast.success('Profile updated successfully')
       localStorage.setItem('user', JSON.stringify({ ...user, ...data }))
+      setIsEditing(false)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { details?: string } } })?.response?.data?.details
       toast.error(msg || 'Failed to update profile')
@@ -127,9 +143,17 @@ export default function ProfilePage() {
 
         <div className="lg:col-span-2 space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Edit Profile</CardTitle>
-              <CardDescription>Update your personal information</CardDescription>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Edit Profile</CardTitle>
+                <CardDescription>Update your personal information</CardDescription>
+              </div>
+              {!isEditing && (
+                <Button size="sm" onClick={() => setIsEditing(true)}>
+                  <PenLine className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -138,6 +162,37 @@ export default function ProfilePage() {
                   <Skeleton className="h-10 rounded" />
                   <Skeleton className="h-10 rounded" />
                 </div>
+              ) : !isEditing ? (
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <dt className="text-sm font-medium text-muted-foreground">Department</dt>
+                    <dd className="text-sm">{effectiveDepartment || '—'}</dd>
+                  </div>
+                  {user.role === 'student' && (
+                    <>
+                      <div className="space-y-1">
+                        <dt className="text-sm font-medium text-muted-foreground">Programme</dt>
+                        <dd className="text-sm">{programme || '—'}</dd>
+                      </div>
+                      <div className="space-y-1">
+                        <dt className="text-sm font-medium text-muted-foreground">Level</dt>
+                        <dd className="text-sm">{level || '—'}</dd>
+                      </div>
+                    </>
+                  )}
+                  {user.role === 'lecturer' && (
+                    <div className="space-y-1">
+                      <dt className="text-sm font-medium text-muted-foreground">Teaching Scope</dt>
+                      <dd className="text-sm">
+                        {LECTURER_LEVEL_SCOPES.find((s) => s.value === levelScope)?.label || levelScope}
+                      </dd>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <dt className="text-sm font-medium text-muted-foreground">Phone Number</dt>
+                    <dd className="text-sm">{phone || '—'}</dd>
+                  </div>
+                </dl>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -211,6 +266,9 @@ export default function ProfilePage() {
                     <Button type="submit" disabled={saving} className="gap-2">
                       <Save className="h-4 w-4" />
                       {saving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                    <Button type="button" variant="outline" disabled={saving} onClick={cancelEdit}>
+                      Cancel
                     </Button>
                   </div>
                 </form>
