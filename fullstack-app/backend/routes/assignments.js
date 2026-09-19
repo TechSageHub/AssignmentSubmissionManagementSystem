@@ -18,6 +18,7 @@ const {
 const { getAssignmentAnalytics } = require('../controllers/analyticsController');
 const { getRubric, saveRubric } = require('../controllers/rubricController');
 const { downloadAllSubmissions } = require('../controllers/downloadController');
+const { exportAssignmentGrades } = require('../controllers/gradeExportController');
 
 const router = Router();
 
@@ -59,6 +60,7 @@ router.delete('/:id', requireRole('lecturer'), deleteAssignment);
 router.post('/:id/submit', requireRole('student'), uploadLimiter, upload.array('files', 5), submitAssignment);
 router.get('/:id/submissions', requireRole('lecturer'), getSubmissionsByAssignment);
 router.get('/:id/analytics', requireRole('lecturer'), getAssignmentAnalytics);
+router.get('/:id/export-grades', requireRole('lecturer'), exportAssignmentGrades);
 router.get('/:id/download-all', requireRole('lecturer'), downloadAllSubmissions);
 router.get('/:id/rubric', getRubric);
 router.put('/:id/rubric', requireRole('lecturer'), saveRubric);

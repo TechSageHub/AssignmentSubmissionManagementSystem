@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/PageState'
-import { ArrowLeft, Download, GraduationCap, BarChart3, List, Eye, Filter, CheckCircle2, Clock3, Square, SquareCheckBig } from 'lucide-react'
+import { ArrowLeft, Download, GraduationCap, BarChart3, List, Eye, Filter, CheckCircle2, Clock3, Square, SquareCheckBig, FileSpreadsheet } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
 
@@ -49,6 +49,7 @@ export default function AssignmentSubmissionsPage() {
   const [bulkFeedback, setBulkFeedback] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const handleDownloadAll = async () => {
     setDownloading(true)
@@ -69,6 +70,28 @@ export default function AssignmentSubmissionsPage() {
       toast.error('Failed to download submissions')
     } finally {
       setDownloading(false)
+    }
+  }
+
+  const handleExportGrades = async () => {
+    setExporting(true)
+    try {
+      const res = await api.get(`/assignments/${id}/export-grades`, { responseType: 'blob' })
+      const disposition = res.headers['content-disposition'] || ''
+      const match = disposition.match(/filename="?([^";]+)"?/i)
+      const filename = match ? match[1] : `assignment_${id}_grades.csv`
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to export grades')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -167,10 +190,16 @@ export default function AssignmentSubmissionsPage() {
         </div>
         <div className="flex items-center gap-2">
           {rows.length > 0 && (
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadAll} disabled={downloading}>
-              <Download className="h-4 w-4" />
-              {downloading ? 'Downloading...' : 'Download All'}
-            </Button>
+            <>
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleExportGrades} disabled={exporting}>
+                <FileSpreadsheet className="h-4 w-4" />
+                {exporting ? 'Exporting...' : 'Export Grades'}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadAll} disabled={downloading}>
+                <Download className="h-4 w-4" />
+                {downloading ? 'Downloading...' : 'Download All'}
+              </Button>
+            </>
           )}
           <div className="flex gap-1 rounded-lg border p-1">
             <Button

@@ -28,7 +28,7 @@ async function findAll(lecturerId) {
 async function findByAssignment(assignmentId) {
   const result = await query(
     `SELECT s.*, u.name AS student_name,
-            g.score, g.feedback, g.graded_at AS grade_graded_at
+            g.id AS grade_id, g.score, g.feedback, g.graded_at AS grade_graded_at
      FROM Submissions s
      JOIN Users u ON u.id = s.student_id
      LEFT JOIN Grades g ON g.submission_id = s.id
