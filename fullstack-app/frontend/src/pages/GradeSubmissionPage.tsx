@@ -32,6 +32,8 @@ export default function GradeSubmissionPage() {
   const [loadError, setLoadError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [releaseMode, setReleaseMode] = useState<'now' | 'schedule' | 'hold'>('now')
+  const [releaseAt, setReleaseAt] = useState('')
   const [submission, setSubmission] = useState<{ student_name: string; original_name: string; assignment_title?: string; assignment_id?: number } | null>(null)
 
   useEffect(() => {
@@ -61,6 +63,16 @@ export default function GradeSubmissionPage() {
           if (grade.score !== null) {
             setScore(String(grade.score))
             setFeedback(grade.feedback || '')
+            if (typeof grade.released === 'boolean') {
+              if (grade.released) {
+                setReleaseMode('now')
+              } else if (grade.released_at) {
+                setReleaseMode('schedule')
+                setReleaseAt(String(grade.released_at).slice(0, 16))
+              } else {
+                setReleaseMode('hold')
+              }
+            }
             if (grade.criteria_scores?.length > 0) {
               setCriteriaScores(
                 grade.criteria_scores.map((cs: { criteria_id: number; score: number; name: string; max_score: number }) => ({
@@ -100,7 +112,15 @@ export default function GradeSubmissionPage() {
     setError('')
     setSaving(true)
     try {
-      const payload: Record<string, unknown> = { score: scoreNum, feedback }
+      const payload: Record<string, unknown> = { score: scoreNum, feedback, release_mode: releaseMode }
+      if (releaseMode === 'schedule') {
+        if (!releaseAt) {
+          setError('Choose a release time for the scheduled grade')
+          setSaving(false)
+          return
+        }
+        payload.release_at = releaseAt
+      }
       if (criteriaScores.length > 0) {
         payload.criteriaScores = criteriaScores.map(c => ({
           criteriaId: c.criteriaId,
@@ -230,6 +250,35 @@ export default function GradeSubmissionPage() {
                 <div className="space-y-2">
                   <Label htmlFor="feedback">Feedback</Label>
                   <Textarea id="feedback" rows={5} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Provide constructive feedback..." />
+                </div>
+                <div className="space-y-2">
+                  <Label>Grade release</Label>
+                  <div className="flex flex-col gap-2 text-sm">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="release" checked={releaseMode === 'now'} onChange={() => setReleaseMode('now')} className="accent-primary" />
+                      Release to student immediately
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="release" checked={releaseMode === 'schedule'} onChange={() => setReleaseMode('schedule')} className="accent-primary" />
+                      Schedule release for later
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="release" checked={releaseMode === 'hold'} onChange={() => setReleaseMode('hold')} className="accent-primary" />
+                      Hold until re-graded
+                    </label>
+                    {releaseMode === 'schedule' && (
+                      <Input
+                        type="datetime-local"
+                        min={new Date().toISOString().slice(0, 16)}
+                        value={releaseAt}
+                        onChange={(e) => setReleaseAt(e.target.value)}
+                        className="mt-1"
+                      />
+                    )}
+                    {releaseMode !== 'now' && (
+                      <p className="text-xs text-muted-foreground">Students will see a withheld grade until it is released.</p>
+                    )}
+                  </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={saving}>
                   {saving ? 'Saving...' : 'Save Grade'}

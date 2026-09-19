@@ -36,6 +36,7 @@ interface MySubmission {
   score: number | null
   feedback: string | null
   grade_graded_at: string | null
+  grade_withheld?: boolean
   files?: HistoryFile[]
   history?: HistoryVersion[]
 }
@@ -131,6 +132,8 @@ export default function MySubmissionsPage() {
                         <span className="text-lg font-bold">{s.score}</span>
                         <span className="text-sm text-muted-foreground">/100</span>
                       </div>
+                    ) : s.grade_withheld ? (
+                      <Badge variant="secondary">Withheld</Badge>
                     ) : (
                       <Badge variant="warning">Pending</Badge>
                     )}

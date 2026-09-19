@@ -42,7 +42,7 @@ async function findByAssignment(assignmentId) {
 async function findByStudent(studentId) {
   const result = await query(
     `SELECT s.*, a.title AS assignment_title, a.due_date,
-            g.score, g.feedback, g.graded_at AS grade_graded_at
+            g.score, g.feedback, g.graded_at AS grade_graded_at, g.released_at AS grade_released_at
      FROM Submissions s
      JOIN Assignments a ON a.id = s.assignment_id
      LEFT JOIN Grades g ON g.submission_id = s.id

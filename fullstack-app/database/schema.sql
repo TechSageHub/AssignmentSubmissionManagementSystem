@@ -193,10 +193,15 @@ BEGIN
         score DECIMAL(5,2) NOT NULL CHECK (score >= 0 AND score <= 100),
         feedback NVARCHAR(MAX),
         graded_at DATETIME2 DEFAULT GETDATE(),
+        released_at DATETIME2,
         updated_at DATETIME2 DEFAULT GETDATE(),
         CONSTRAINT FK_Grades_Submission FOREIGN KEY (submission_id) REFERENCES Submissions(id) ON DELETE CASCADE
     );
 END
+GO
+
+IF COL_LENGTH('dbo.Grades', 'released_at') IS NULL
+    ALTER TABLE Grades ADD released_at DATETIME2 NULL;
 GO
 
 -- ================= Rubrics =================

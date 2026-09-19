@@ -7,6 +7,18 @@ const { sendGradeReleased } = require('../utils/emailHelper');
 const { notifyGradeReleased } = require('../utils/notificationHelper');
 const auditLog = require('../utils/auditLogger');
 const { assertSubmissionAssignmentOwner, assertSubmissionReadAccess } = require('../utils/authorization');
+const { parseInputDate, toStoredUtc } = require('../utils/dates');
+
+// Resolve grade release timing. 'now' (default) releases immediately, 'schedule'
+// defers to a chosen instant, 'hold' keeps the grade hidden from students.
+function resolveReleaseTime(mode, releaseAt) {
+  if (mode === 'hold') return null;
+  if (mode === 'schedule') {
+    const when = parseInputDate(releaseAt);
+    return toStoredUtc(when);
+  }
+  return toStoredUtc(new Date());
+}
 
 async function gradeSubmission(req, res, next) {
   try {
@@ -35,6 +47,15 @@ async function gradeSubmission(req, res, next) {
       return res.status(400).json({ error: 'ValidationError', details: 'Score must be a number between 0 and 100' });
     }
 
+    const releaseMode = req.body.release_mode || 'now';
+    if (!['now', 'schedule', 'hold'].includes(releaseMode)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'release_mode must be "now", "schedule", or "hold"' });
+    }
+    if (releaseMode === 'schedule' && !parseInputDate(req.body.release_at)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'release_at is required when scheduling grade release' });
+    }
+    const releasedAt = resolveReleaseTime(releaseMode, req.body.release_at);
+
     // Validate per-criterion scores against the assignment's rubric so grades
     // can't reference foreign criteria or exceed each criterion's maximum.
     let validatedCriteria = [];
@@ -59,6 +80,7 @@ async function gradeSubmission(req, res, next) {
       submissionId,
       score: numericScore,
       feedback: feedback || null,
+      releasedAt,
     });
 
     // Save per-criterion scores if provided
@@ -66,16 +88,19 @@ async function gradeSubmission(req, res, next) {
       await rubricModel.saveGradeCriteria(grade.id, validatedCriteria);
     }
 
-    try {
-      const memberRows = await groupMemberModel.findBySubmission(submissionId);
-      const recipientIds = [submission.student_id, ...memberRows.map(m => m.user_id)];
-      await notifyGradeReleased(recipientIds, submission.assignment_title, submissionId);
-      const student = await userModel.findByIdWithEmail(submission.student_id);
-      if (student) {
-        await sendGradeReleased(student.email, student.name, submission.assignment_title, numericScore, feedback || null);
+    const releasedNow = releasedAt != null && parseInputDate(releasedAt) <= new Date();
+    if (releasedNow) {
+      try {
+        const memberRows = await groupMemberModel.findBySubmission(submissionId);
+        const recipientIds = [submission.student_id, ...memberRows.map(m => m.user_id)];
+        await notifyGradeReleased(recipientIds, submission.assignment_title, submissionId);
+        const student = await userModel.findByIdWithEmail(submission.student_id);
+        if (student) {
+          await sendGradeReleased(student.email, student.name, submission.assignment_title, numericScore, feedback || null);
+        }
+      } catch (emailErr) {
+        console.error('Failed to send grade notification email:', emailErr.message);
       }
-    } catch (emailErr) {
-      console.error('Failed to send grade notification email:', emailErr.message);
     }
 
     auditLog.log(req, 'grade', 'submission', submissionId, { score: numericScore });
@@ -104,6 +129,15 @@ async function bulkGradeSubmissions(req, res, next) {
       return res.status(400).json({ error: 'ValidationError', details: 'Score must be a number between 0 and 100' });
     }
 
+    const releaseMode = (req.body.release_mode || 'now').toString();
+    if (!['now', 'schedule', 'hold'].includes(releaseMode)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'release_mode must be "now", "schedule", or "hold"' });
+    }
+    if (releaseMode === 'schedule' && !parseInputDate(req.body.release_at)) {
+      return res.status(400).json({ error: 'ValidationError', details: 'release_at is required when scheduling grade release' });
+    }
+    const releasedAt = resolveReleaseTime(releaseMode, req.body.release_at);
+
     const results = [];
     const denied = [];
     for (const submissionId of submissionIds) {
@@ -122,7 +156,7 @@ async function bulkGradeSubmissions(req, res, next) {
         denied.push({ submissionId: parsedId, reason: ownership.message });
         continue;
       }
-      const grade = await gradeModel.upsert({ submissionId: parsedId, score: numericScore, feedback: feedback || null });
+      const grade = await gradeModel.upsert({ submissionId: parsedId, score: numericScore, feedback: feedback || null, releasedAt });
       results.push({ submissionId: parsedId, gradeId: grade.id });
     }
 
@@ -162,7 +196,22 @@ async function getGrade(req, res, next) {
     }
 
     const criteriaScores = await rubricModel.findByGrade(grade.id);
-    res.json({ ...grade, criteria_scores: criteriaScores });
+
+    const releasedAt = grade.released_at != null ? parseInputDate(grade.released_at) : null;
+    const isReleased = releasedAt != null && releasedAt <= new Date();
+    if (req.user.role === 'student' && !isReleased) {
+      return res.json({
+        ...grade,
+        released: false,
+        score: null,
+        feedback: null,
+        released_at: null,
+        criteria_scores: [],
+        status: 'withheld',
+      });
+    }
+
+    res.json({ ...grade, released: isReleased, criteria_scores: criteriaScores });
   } catch (err) {
     next(err);
   }

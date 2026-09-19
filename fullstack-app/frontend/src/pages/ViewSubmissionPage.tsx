@@ -27,7 +27,7 @@ export default function ViewSubmissionPage() {
     submitted_at: string
     is_late: boolean
     files?: Array<{ id: number; original_name: string; file_path: string }>
-    grade?: { score: number; feedback: string | null; status?: string; criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number }[] }
+    grade?: { score: number | null; feedback: string | null; status?: string; released?: boolean; released_at?: string | null; criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number }[] }
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -201,6 +201,11 @@ export default function ViewSubmissionPage() {
                       </div>
                     </>
                   )}
+                </div>
+              ) : submission.grade?.released === false && submission.grade.status === 'withheld' ? (
+                <div className="py-6 text-center">
+                  <p className="text-sm font-medium text-muted-foreground">Grade withheld</p>
+                  <p className="text-xs text-muted-foreground mt-1">Your grade has not been released yet. Contact your lecturer if you have questions.</p>
                 </div>
               ) : (
                 <div className="py-6 text-center">

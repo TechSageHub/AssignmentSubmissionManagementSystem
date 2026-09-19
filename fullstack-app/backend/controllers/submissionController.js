@@ -21,6 +21,21 @@ function buildFilePaths(assignmentId, files) {
   });
 }
 
+// Blank out grade fields students must not see yet (held or scheduled grades).
+function applyGradeReleaseGate(row) {
+  const releasedAt = row.grade_released_at != null ? parseInputDate(row.grade_released_at) : null;
+  const isReleased = releasedAt != null && releasedAt <= new Date();
+  if (!isReleased) {
+    row.score = null;
+    row.feedback = null;
+    row.grade_graded_at = null;
+    row.grade_withheld = true;
+  } else {
+    row.grade_withheld = false;
+  }
+  return row;
+}
+
 async function submitAssignment(req, res, next) {
   try {
     const assignmentId = parseInt(req.params.id, 10);
@@ -255,6 +270,7 @@ async function getMySubmissions(req, res, next) {
       }
       sub.files = await submissionFileModel.findBySubmission(sub.id);
       sub.history = await submissionHistoryModel.findBySubmission(sub.id);
+      applyGradeReleaseGate(sub);
     }
     res.json(submissions);
   } catch (err) {

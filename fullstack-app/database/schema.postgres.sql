@@ -109,8 +109,11 @@ CREATE TABLE IF NOT EXISTS Grades (
     score DECIMAL(5,2) NOT NULL CHECK (score >= 0 AND score <= 100),
     feedback TEXT,
     graded_at TIMESTAMP DEFAULT NOW(),
+    released_at TIMESTAMP,
     updated_at TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE Grades ADD COLUMN IF NOT EXISTS released_at TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS RubricCriteria (
     id SERIAL PRIMARY KEY,
