@@ -20,6 +20,7 @@ interface SubmissionRow {
   is_late: boolean
   score?: number | null
   feedback?: string | null
+  history?: { id: number }[]
 }
 
 interface AnalyticsData {
@@ -322,6 +323,9 @@ export default function AssignmentSubmissionsPage() {
                   <div className="flex items-center gap-2">
                     <h3 className="font-medium">{r.student_name}</h3>
                     {r.is_late ? <Badge variant="destructive">Late</Badge> : <Badge variant="success">On Time</Badge>}
+                    {(r.history?.length ?? 0) > 0 && (
+                      <Badge variant="secondary" title={`${r.history!.length + 1} versions total`}>Resubmitted ×{r.history!.length}</Badge>
+                    )}
                   </div>
                   <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
                     <span>{r.original_name}</span>

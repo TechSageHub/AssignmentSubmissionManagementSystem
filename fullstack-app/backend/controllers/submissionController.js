@@ -3,6 +3,7 @@ const assignmentModel = require('../models/assignment');
 const submissionModel = require('../models/submission');
 const submissionFileModel = require('../models/submissionFile');
 const groupMemberModel = require('../models/groupMember');
+const submissionHistoryModel = require('../models/submissionHistory');
 const userModel = require('../models/user');
 const { sendSubmissionConfirmation } = require('../utils/emailHelper');
 const { notifySubmissionConfirmed } = require('../utils/notificationHelper');
@@ -90,30 +91,65 @@ async function submitAssignment(req, res, next) {
           { assignmentId, studentId: req.user.id }
         );
 
-        let orphanedFiles = [];
+        let submission;
         if (existing.recordset[0]) {
-          const oldRows = await exec(
-            'SELECT file_path FROM SubmissionFiles WHERE submission_id = @oldId',
-            { oldId: existing.recordset[0].id }
+          const oldSubmission = existing.recordset[0];
+          const oldFiles = await exec(
+            'SELECT * FROM SubmissionFiles WHERE submission_id = @oldId',
+            { oldId: oldSubmission.id }
           );
-          orphanedFiles = oldRows.recordset.map(r => r.file_path);
-          orphanedFiles.push(existing.recordset[0].file_path);
-          await exec('DELETE FROM Submissions WHERE id = @oldId', { oldId: existing.recordset[0].id });
-        }
+          // Archive the previous current version (its files stay in storage).
+          await exec(
+            `INSERT INTO SubmissionHistory (submission_id, version_number, file_path, original_name, is_late, submitted_at, files_json)
+             OUTPUT INSERTED.*
+             SELECT @submissionId, COALESCE(MAX(version_number), -1) + 1, @filePath, @originalName, @isLate, @submittedAt, @filesJson
+             FROM SubmissionHistory
+             WHERE submission_id = @submissionId`,
+            {
+              submissionId: oldSubmission.id,
+              filePath: oldSubmission.file_path,
+              originalName: oldSubmission.original_name,
+              isLate: oldSubmission.is_late,
+              submittedAt: oldSubmission.submitted_at,
+              filesJson: JSON.stringify(
+                (oldFiles.recordset || []).map(f => ({
+                  file_path: f.file_path,
+                  original_name: f.original_name,
+                  file_size: f.file_size ?? 0,
+                  mime_type: f.mime_type || null,
+                }))
+              ),
+            }
+          );
+          await exec('DELETE FROM SubmissionFiles WHERE submission_id = @submissionId', { submissionId: oldSubmission.id });
 
-        const created = await exec(
-          `INSERT INTO Submissions (assignment_id, student_id, file_path, original_name, is_late)
-           OUTPUT INSERTED.*
-           VALUES (@assignmentId, @studentId, @filePath, @originalName, @isLate)`,
-          {
-            assignmentId,
-            studentId: req.user.id,
-            filePath: filePaths[0],
-            originalName: req.files[0].originalname,
-            isLate,
-          }
-        );
-        const submission = created.recordset[0];
+          const updated = await exec(
+            `UPDATE Submissions SET file_path = @filePath, original_name = @originalName, is_late = @isLate, submitted_at = GETDATE()
+             OUTPUT INSERTED.*
+             WHERE id = @id`,
+            {
+              id: oldSubmission.id,
+              filePath: filePaths[0],
+              originalName: req.files[0].originalname,
+              isLate,
+            }
+          );
+          submission = updated.recordset[0];
+        } else {
+          const created = await exec(
+            `INSERT INTO Submissions (assignment_id, student_id, file_path, original_name, is_late)
+             OUTPUT INSERTED.*
+             VALUES (@assignmentId, @studentId, @filePath, @originalName, @isLate)`,
+            {
+              assignmentId,
+              studentId: req.user.id,
+              filePath: filePaths[0],
+              originalName: req.files[0].originalname,
+              isLate,
+            }
+          );
+          submission = created.recordset[0];
+        }
 
         for (let i = 0; i < req.files.length; i++) {
           const file = req.files[i];
@@ -138,7 +174,7 @@ async function submitAssignment(req, res, next) {
           );
         }
 
-        return { submission, orphanedFiles };
+        return { submission };
       });
     } catch (err) {
       // Clean up the just-stored files (best effort) when the transaction rolls back.
@@ -150,15 +186,12 @@ async function submitAssignment(req, res, next) {
       throw err;
     }
 
-    // Commit succeeded — remove the replaced submission's stored files (best effort).
-    for (const fp of result.orphanedFiles || []) {
-      await storage.unlink(fp);
-    }
-
     const members = await groupMemberModel.findBySubmission(result.submission.id);
     const files = await submissionFileModel.findBySubmission(result.submission.id);
+    const history = await submissionHistoryModel.findBySubmission(result.submission.id);
     result.submission.group_members = members;
     result.submission.files = files;
+    result.submission.history = history;
 
     try {
       await notifySubmissionConfirmed(req.user.id, assignment.title, result.submission.id);
@@ -193,6 +226,7 @@ async function getSubmissionsByAssignment(req, res, next) {
     const grouped = await groupMemberModel.findBySubmissions(ids);
     for (const sub of submissions) {
       sub.group_members = grouped[sub.id] || [];
+      sub.history = await submissionHistoryModel.findBySubmission(sub.id);
     }
     res.json(submissions);
   } catch (err) {
@@ -219,6 +253,8 @@ async function getMySubmissions(req, res, next) {
       if (sub.due_date != null) {
         sub.due_date = toIsoUtc(sub.due_date);
       }
+      sub.files = await submissionFileModel.findBySubmission(sub.id);
+      sub.history = await submissionHistoryModel.findBySubmission(sub.id);
     }
     res.json(submissions);
   } catch (err) {
@@ -250,6 +286,7 @@ async function getSubmission(req, res, next) {
     const files = await submissionFileModel.findBySubmission(submission.id);
     submission.group_members = members;
     submission.files = files;
+    submission.history = await submissionHistoryModel.findBySubmission(submission.id);
 
     res.json(submission);
   } catch (err) {
@@ -278,8 +315,31 @@ async function getSubmissionFile(req, res, next) {
     }
 
     const fileId = parseInt(req.query.fileId, 10);
+    const requestedPath = req.query.filePath;
     let fileRecord = null;
-    if (!isNaN(fileId)) {
+
+    if (requestedPath) {
+      // Allow downloading any file that belongs to this submission's lineage,
+      // including archived prior versions.
+      const pathToName = new Map([[submission.file_path, submission.original_name]]);
+      for (const f of await submissionFileModel.findBySubmission(submission.id)) {
+        pathToName.set(f.file_path, f.original_name);
+      }
+      for (const h of await submissionHistoryModel.findBySubmission(submission.id)) {
+        pathToName.set(h.file_path, h.original_name);
+        let entries = [];
+        try {
+          entries = JSON.parse(h.files_json || '[]');
+        } catch { /* ignore malformed json */ }
+        for (const f of entries) {
+          if (f && f.file_path) pathToName.set(f.file_path, f.original_name || pathToName.get(f.file_path) || 'file');
+        }
+      }
+      if (!pathToName.has(requestedPath)) {
+        return res.status(404).json({ error: 'NotFoundError', details: 'File not found' });
+      }
+      fileRecord = { file_path: requestedPath, original_name: pathToName.get(requestedPath) };
+    } else if (!isNaN(fileId)) {
       fileRecord = await submissionFileModel.findById(fileId);
       if (!fileRecord || fileRecord.submission_id !== submission.id) {
         return res.status(404).json({ error: 'NotFoundError', details: 'File not found' });

@@ -8,7 +8,24 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState, EmptyState } from '@/components/PageState'
-import { Eye, FileText, Calendar } from 'lucide-react'
+import { Eye, FileText, Calendar, Download, ChevronDown, History } from 'lucide-react'
+
+interface HistoryFile {
+  file_path: string
+  original_name: string
+  file_size?: number
+  mime_type?: string | null
+}
+
+interface HistoryVersion {
+  id: number
+  version_number: number
+  file_path: string
+  original_name: string
+  is_late: boolean
+  submitted_at: string
+  files_json: string | null
+}
 
 interface MySubmission {
   id: number
@@ -19,6 +36,16 @@ interface MySubmission {
   score: number | null
   feedback: string | null
   grade_graded_at: string | null
+  files?: HistoryFile[]
+  history?: HistoryVersion[]
+}
+
+function parseFiles(version: HistoryVersion): HistoryFile[] {
+  try {
+    const parsed = JSON.parse(version.files_json || '[]')
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed
+  } catch { /* ignore */ }
+  return [{ file_path: version.file_path, original_name: version.original_name }]
 }
 
 export default function MySubmissionsPage() {
@@ -27,6 +54,7 @@ export default function MySubmissionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [openHistory, setOpenHistory] = useState<number | null>(null)
 
   useEffect(() => {
     setError(false)
@@ -77,16 +105,24 @@ export default function MySubmissionsPage() {
       ) : (
         <div className="space-y-3">
           {submissions.map((s) => (
-            <Link key={s.id} to={`/submissions/${s.id}`} className="block">
-              <Card className="transition-all duration-150 hover:shadow-md hover:border-primary/20">
-                <CardContent className="flex items-center justify-between p-4">
+            <Card key={s.id} className="transition-all duration-150 hover:shadow-md hover:border-primary/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-medium truncate">{s.assignment_title}</h3>
+                    <Link to={`/submissions/${s.id}`} className="block">
+                      <h3 className="font-medium truncate hover:text-primary">{s.assignment_title}</h3>
+                    </Link>
                     <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5" />
                         {new Date(s.submitted_at).toLocaleDateString()}
                       </span>
+                      {(s.history?.length ?? 0) > 0 && (
+                        <span className="flex items-center gap-1">
+                          <History className="h-3.5 w-3.5" />
+                          {(s.history?.length ?? 0) + 1} versions
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 ml-4">
@@ -101,9 +137,63 @@ export default function MySubmissionsPage() {
                     {s.is_late && <Badge variant="destructive">Late</Badge>}
                     <Eye className="h-4 w-4 text-muted-foreground" />
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                </div>
+
+                {(s.history?.length ?? 0) > 0 && (
+                  <div className="mt-3 border-t pt-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setOpenHistory(openHistory === s.id ? null : s.id)}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${openHistory === s.id ? 'rotate-180' : ''}`} />
+                      View version history
+                    </button>
+                    {openHistory === s.id && (
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Current version</p>
+                          <div className="space-y-1">
+                            {(s.files ?? []).map((f) => (
+                              <a
+                                key={f.file_path}
+                                href={`/api/submissions/${s.id}/file?filePath=${encodeURIComponent(f.file_path)}`}
+                                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors"
+                              >
+                                <Download className="h-3.5 w-3.5 text-primary" />
+                                <span className="truncate">{f.original_name || f.file_path}</span>
+                              </a>
+                            ))}
+                            {(s.files?.length ?? 0) === 0 && (
+                              <p className="px-2 py-1 text-xs text-muted-foreground">No files attached.</p>
+                            )}
+                          </div>
+                        </div>
+                        {s.history?.map((v) => (
+                          <div key={v.id}>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                              Version {v.version_number + 1} · {new Date(v.submitted_at).toLocaleString()}
+                            </p>
+                            <div className="space-y-1">
+                              {parseFiles(v).map((f, i) => (
+                                <a
+                                  key={i}
+                                  href={`/api/submissions/${s.id}/file?filePath=${encodeURIComponent(f.file_path)}`}
+                                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors"
+                                >
+                                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span className="truncate">{f.original_name || f.file_path}</span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
