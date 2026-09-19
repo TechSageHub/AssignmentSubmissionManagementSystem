@@ -34,7 +34,7 @@ export default function CreateAssignmentPage() {
   const [lateCutoff, setLateCutoff] = useState('')
   const [publishDate, setPublishDate] = useState('')
   const [showScheduling, setShowScheduling] = useState(false)
-  const [criteria, setCriteria] = useState<{ name: string; maxScore: number }[]>([])
+  const [criteria, setCriteria] = useState<{ name: string; maxScore: number; weight: number }[]>([])
   const [showRubric, setShowRubric] = useState(false)
   const [showLatePolicy, setShowLatePolicy] = useState(false)
   const [error, setError] = useState('')

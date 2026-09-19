@@ -5,6 +5,7 @@ import { Plus, Trash2 } from 'lucide-react'
 interface Criterion {
   name: string
   maxScore: number
+  weight: number
 }
 
 interface RubricBuilderProps {
@@ -15,7 +16,7 @@ interface RubricBuilderProps {
 
 export default function RubricBuilder({ criteria, onChange, readOnly }: RubricBuilderProps) {
   const addCriterion = () => {
-    onChange([...criteria, { name: '', maxScore: 10 }])
+    onChange([...criteria, { name: '', maxScore: 10, weight: 100 }])
   }
 
   const removeCriterion = (i: number) => {
@@ -29,7 +30,8 @@ export default function RubricBuilder({ criteria, onChange, readOnly }: RubricBu
     onChange(updated)
   }
 
-  const total = criteria.reduce((sum, c) => sum + Number(c.maxScore), 0)
+  const weightTotal = criteria.reduce((sum, c) => sum + (Number(c.weight) || 0), 0)
+  const weightWarning = criteria.length > 0 && Math.abs(weightTotal - 100) > 0.01
 
   if (readOnly) {
     return (
@@ -37,12 +39,12 @@ export default function RubricBuilder({ criteria, onChange, readOnly }: RubricBu
         {criteria.map((c, i) => (
           <div key={i} className="flex items-center justify-between rounded-lg border p-3 text-sm">
             <span className="font-medium">{c.name}</span>
-            <span className="text-muted-foreground">{c.maxScore} pts</span>
+            <span className="text-muted-foreground">{(Number(c.weight) || 0).toFixed(0)}%</span>
           </div>
         ))}
         <div className="flex justify-between border-t pt-2 text-sm font-medium">
-          <span>Total</span>
-          <span>{total} / 100</span>
+          <span>Total weight</span>
+          <span>{weightTotal.toFixed(0)}%</span>
         </div>
       </div>
     )
@@ -67,7 +69,17 @@ export default function RubricBuilder({ criteria, onChange, readOnly }: RubricBu
             min={1}
             max={100}
           />
-          <span className="text-xs text-muted-foreground w-12">pts</span>
+          <span className="text-xs text-muted-foreground w-8">pts</span>
+          <Input
+            type="number"
+            placeholder="Wt"
+            value={c.weight}
+            onChange={(e) => update(i, 'weight', Number(e.target.value))}
+            className="w-20"
+            min={0}
+            max={100}
+          />
+          <span className="text-xs text-muted-foreground w-6">%</span>
           <Button variant="ghost" size="icon" onClick={() => removeCriterion(i)} className="text-red-500 shrink-0">
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -78,9 +90,14 @@ export default function RubricBuilder({ criteria, onChange, readOnly }: RubricBu
           <Plus className="mr-1 h-4 w-4" />
           Add Criterion
         </Button>
-        <span className="text-sm font-medium text-muted-foreground">
-          Total: {total} / 100 pts
-        </span>
+        <div className="text-right text-sm">
+          <span className={`font-medium ${weightWarning ? 'text-amber-600' : 'text-muted-foreground'}`}>
+            Total weight: {weightTotal.toFixed(0)}%
+          </span>
+          {weightWarning && (
+            <p className="text-xs text-amber-600">Weights should sum to 100% for a /100 grade.</p>
+          )}
+        </div>
       </div>
     </div>
   )

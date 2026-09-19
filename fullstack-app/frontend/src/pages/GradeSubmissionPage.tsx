@@ -18,6 +18,7 @@ interface CriterionScore {
   criteriaId: number
   name: string
   maxScore: number
+  weight: number
   score: string
 }
 
@@ -47,10 +48,11 @@ export default function GradeSubmissionPage() {
           const { data: rubric } = await api.get(`/assignments/${sub.assignment_id}/rubric`)
           if (Array.isArray(rubric) && rubric.length > 0) {
             setCriteriaScores(
-              rubric.map((c: { id: number; name: string; max_score: number }) => ({
+              rubric.map((c: { id: number; name: string; max_score: number; weight?: number | null }) => ({
                 criteriaId: c.id,
                 name: c.name,
                 maxScore: c.max_score,
+                weight: c.weight ?? 100,
                 score: '',
               }))
             )
@@ -75,10 +77,11 @@ export default function GradeSubmissionPage() {
             }
             if (grade.criteria_scores?.length > 0) {
               setCriteriaScores(
-                grade.criteria_scores.map((cs: { criteria_id: number; score: number; name: string; max_score: number }) => ({
+                grade.criteria_scores.map((cs: { criteria_id: number; score: number; name: string; max_score: number; weight?: number | null }) => ({
                   criteriaId: cs.criteria_id,
                   name: cs.name,
                   maxScore: cs.max_score,
+                  weight: cs.weight ?? 100,
                   score: String(cs.score),
                 }))
               )
@@ -97,9 +100,13 @@ export default function GradeSubmissionPage() {
   const updateCriterionScore = (i: number, value: string) => {
     const updated = criteriaScores.map((c, idx) => idx === i ? { ...c, score: value } : c)
     setCriteriaScores(updated)
-    // Auto-calculate total
-    const total = updated.reduce((sum, c) => sum + (Number(c.score) || 0), 0)
-    setScore(String(total))
+    // Weighted total: Σ (score/max × weight), capped at 100
+    const total = updated.reduce((sum, c) => {
+      const max = Number(c.maxScore) || 0
+      if (!(Number(c.score) && max)) return sum
+      return sum + ((Number(c.score) / max) * (Number(c.weight) || 100))
+    }, 0)
+    setScore(String(Math.round(Math.min(total, 100) * 100) / 100))
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -223,7 +230,7 @@ export default function GradeSubmissionPage() {
                     <Label className="text-xs text-muted-foreground">Rubric Criteria</Label>
                     {criteriaScores.map((c, i) => (
                       <div key={c.criteriaId} className="flex items-center gap-3">
-                        <span className="flex-1 text-sm">{c.name}</span>
+                        <span className="flex-1 text-sm">{c.name} <span className="text-xs text-muted-foreground">({Number(c.weight) || 100}%)</span></span>
                         <Input
                           type="number"
                           min={0}
@@ -237,8 +244,8 @@ export default function GradeSubmissionPage() {
                       </div>
                     ))}
                     <div className="border-t pt-2 flex justify-between text-sm font-medium">
-                      <span>Total</span>
-                      <span>{criteriaScores.reduce((s, c) => s + (Number(c.score) || 0), 0)} / {criteriaScores.reduce((s, c) => s + c.maxScore, 0)}</span>
+                      <span>Weighted total</span>
+                      <span>{score || '0'} / 100</span>
                     </div>
                   </div>
                 )}

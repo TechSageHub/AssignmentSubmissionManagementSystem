@@ -13,10 +13,13 @@ async function saveCriteria(assignmentId, criteria) {
     await exec('DELETE FROM RubricCriteria WHERE assignment_id = @assignmentId', { assignmentId });
     for (let i = 0; i < criteria.length; i++) {
       const c = criteria[i];
+      const weight = c.weight === undefined || c.weight === null || c.weight === ''
+        ? null
+        : Number(c.weight);
       await exec(
-        `INSERT INTO RubricCriteria (assignment_id, name, max_score, sort_order)
-         VALUES (@assignmentId, @name, @maxScore, @sortOrder)`,
-        { assignmentId, name: c.name, maxScore: c.maxScore, sortOrder: i }
+        `INSERT INTO RubricCriteria (assignment_id, name, max_score, weight, sort_order)
+         VALUES (@assignmentId, @name, @maxScore, @weight, @sortOrder)`,
+        { assignmentId, name: c.name, maxScore: c.maxScore, weight, sortOrder: i }
       );
     }
   });
@@ -37,7 +40,7 @@ async function saveGradeCriteria(gradeId, criteriaScores) {
 
 async function findByGrade(gradeId) {
   const result = await query(
-    `SELECT gc.*, rc.name, rc.max_score
+    `SELECT gc.*, rc.name, rc.max_score, rc.weight
      FROM GradeCriteria gc
      JOIN RubricCriteria rc ON rc.id = gc.criteria_id
      WHERE gc.grade_id = @gradeId

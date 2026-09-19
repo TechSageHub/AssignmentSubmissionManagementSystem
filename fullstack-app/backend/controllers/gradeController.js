@@ -58,30 +58,38 @@ async function gradeSubmission(req, res, next) {
 
     // Validate per-criterion scores against the assignment's rubric so grades
     // can't reference foreign criteria or exceed each criterion's maximum.
+    // When criteria scores are supplied the overall score is derived from
+    // them as a weighted total (score/max × weight), so mismatched posted
+    // totals can't corrupt the grade record.
     let validatedCriteria = [];
+    let weightedScore = null;
     if (Array.isArray(criteriaScores) && criteriaScores.length > 0) {
       const rubric = await rubricModel.findByAssignment(submission.assignment_id);
-      const allowed = new Map(rubric.map(c => [c.id, Number(c.max_score)]));
+      const allowed = new Map(rubric.map(c => [c.id, { max: Number(c.max_score), weight: c.weight == null ? null : Number(c.weight) }]));
+      let total = 0;
       for (const cs of criteriaScores) {
         const criteriaId = Number(cs.criteriaId);
         const criterionScore = Number(cs.score);
-        const maxScore = allowed.get(criteriaId);
-        if (maxScore === undefined) {
+        const meta = allowed.get(criteriaId);
+        if (!meta) {
           return res.status(400).json({ error: 'ValidationError', details: `Unknown rubric criteria: ${cs.criteriaId}` });
         }
-        if (!Number.isFinite(criterionScore) || criterionScore < 0 || criterionScore > maxScore) {
-          return res.status(400).json({ error: 'ValidationError', details: `Score for "${cs.criteriaId}" must be between 0 and ${maxScore}` });
+        if (!Number.isFinite(criterionScore) || criterionScore < 0 || criterionScore > meta.max) {
+          return res.status(400).json({ error: 'ValidationError', details: `Score for "${cs.criteriaId}" must be between 0 and ${meta.max}` });
         }
         validatedCriteria.push({ criteriaId, score: criterionScore });
+        total += (criterionScore / meta.max) * (meta.weight ?? 100);
       }
+      weightedScore = Math.round(total * 100) / 100;
     }
 
     const grade = await gradeModel.upsert({
       submissionId,
-      score: numericScore,
+      score: weightedScore ?? numericScore,
       feedback: feedback || null,
       releasedAt,
     });
+    const finalScore = weightedScore ?? numericScore;
 
     // Save per-criterion scores if provided
     if (validatedCriteria.length > 0) {
@@ -96,14 +104,14 @@ async function gradeSubmission(req, res, next) {
         await notifyGradeReleased(recipientIds, submission.assignment_title, submissionId);
         const student = await userModel.findByIdWithEmail(submission.student_id);
         if (student) {
-          await sendGradeReleased(student.email, student.name, submission.assignment_title, numericScore, feedback || null);
+          await sendGradeReleased(student.email, student.name, submission.assignment_title, finalScore, feedback || null);
         }
       } catch (emailErr) {
         console.error('Failed to send grade notification email:', emailErr.message);
       }
     }
 
-    auditLog.log(req, 'grade', 'submission', submissionId, { score: numericScore });
+    auditLog.log(req, 'grade', 'submission', submissionId, { score: finalScore });
 
     const gradeWithCriteria = await gradeModel.findBySubmission(submissionId);
     gradeWithCriteria.criteria_scores = await rubricModel.findByGrade(grade.id);

@@ -212,10 +212,15 @@ BEGIN
         assignment_id INT NOT NULL,
         name NVARCHAR(200) NOT NULL,
         max_score DECIMAL(5,2) NOT NULL CHECK (max_score > 0),
+        weight DECIMAL(5,2),
         sort_order INT NOT NULL DEFAULT 0,
         CONSTRAINT FK_RubricCriteria_Assignment FOREIGN KEY (assignment_id) REFERENCES Assignments(id) ON DELETE CASCADE
     );
 END
+GO
+
+IF COL_LENGTH('dbo.RubricCriteria', 'weight') IS NULL
+    ALTER TABLE RubricCriteria ADD weight DECIMAL(5,2) NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_RubricCriteria_assignment_id' AND object_id = OBJECT_ID('RubricCriteria'))

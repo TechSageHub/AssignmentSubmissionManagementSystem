@@ -120,8 +120,11 @@ CREATE TABLE IF NOT EXISTS RubricCriteria (
     assignment_id INT NOT NULL REFERENCES Assignments(id) ON DELETE CASCADE,
     name VARCHAR(200) NOT NULL,
     max_score DECIMAL(5,2) NOT NULL CHECK (max_score > 0),
+    weight DECIMAL(5,2),
     sort_order INT NOT NULL DEFAULT 0
 );
+
+ALTER TABLE RubricCriteria ADD COLUMN IF NOT EXISTS weight DECIMAL(5,2);
 
 CREATE INDEX IF NOT EXISTS IX_RubricCriteria_assignment_id ON RubricCriteria(assignment_id);
 

@@ -27,7 +27,7 @@ export default function ViewSubmissionPage() {
     submitted_at: string
     is_late: boolean
     files?: Array<{ id: number; original_name: string; file_path: string }>
-    grade?: { score: number | null; feedback: string | null; status?: string; released?: boolean; released_at?: string | null; criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number }[] }
+    grade?: { score: number | null; feedback: string | null; status?: string; released?: boolean; released_at?: string | null; criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number; weight?: number | null }[] }
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -180,7 +180,10 @@ export default function ViewSubmissionPage() {
                         <div className="space-y-2">
                           {submission.grade.criteria_scores.map((cs) => (
                             <div key={cs.criteria_id} className="flex items-center justify-between text-sm">
-                              <span>{cs.name}</span>
+                              <span>
+                                {cs.name}{' '}
+                                <span className="text-xs text-muted-foreground">({(cs.weight ?? 100).toFixed(0)}%)</span>
+                              </span>
                               <span className="font-medium">{cs.score} / {cs.max_score}</span>
                             </div>
                           ))}
