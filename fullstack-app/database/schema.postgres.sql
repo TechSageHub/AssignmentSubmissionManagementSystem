@@ -212,6 +212,31 @@ CREATE TABLE IF NOT EXISTS Announcements (
 
 CREATE INDEX IF NOT EXISTS IX_Announcements_published_at ON Announcements(published_at);
 
+-- ================ EmailOutbox ================
+-- Durable outbound email queue (see backend/models/emailOutbox.js +
+-- utils/emailQueue.js). Workers claim 'pending' rows whose next_attempt_at has
+-- passed, send via SMTP, then mark 'sent'; on failure they bump attempts and
+-- back off exponentially until max_attempts. Rows stuck in 'sending' after a
+-- crash are requeued to 'pending' when the worker restarts.
+CREATE TABLE IF NOT EXISTS EmailOutbox (
+    id              BIGSERIAL PRIMARY KEY,
+    recipient_email VARCHAR(255) NOT NULL,
+    recipient_name  VARCHAR(120),
+    subject         VARCHAR(255) NOT NULL,
+    body_html       TEXT          NOT NULL,
+    status          VARCHAR(20)   NOT NULL DEFAULT 'pending',
+    attempts        INTEGER       NOT NULL DEFAULT 0,
+    max_attempts    INTEGER       NOT NULL DEFAULT 5,
+    next_attempt_at TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    claimed_at      TIMESTAMPTZ,
+    last_error      VARCHAR(500),
+    sent_at         TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS IX_EmailOutbox_due ON EmailOutbox(status, next_attempt_at.divide);
+CREATE INDEX IF NOT EXISTS IX_EmailOutbox_created ON EmailOutbox(created_at);
+
 CREATE TABLE IF NOT EXISTS SystemConfig (
     key VARCHAR(100) PRIMARY KEY,
     value TEXT

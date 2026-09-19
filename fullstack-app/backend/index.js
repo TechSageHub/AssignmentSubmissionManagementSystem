@@ -5,6 +5,7 @@ const path = require('path');
 const http = require('http');
 const config = require('./config/env');
 const reminderService = require('./services/reminderService');
+const emailQueue = require('./utils/emailQueue');
 const systemConfigModel = require('./models/systemConfig');
 
 // CORS: allow the configured frontend origins plus common dev ports. When no
@@ -117,6 +118,7 @@ app.use((err, req, res, _next) => {
 if (require.main === module) {
   if (process.env.VERCEL !== '1') {
     reminderService.start();
+  emailQueue.start();
   }
 
   // Detect ngrok URL from local API (runs alongside ngrok CLI)

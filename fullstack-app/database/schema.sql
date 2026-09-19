@@ -385,6 +385,34 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Announcements_publishe
     CREATE INDEX IX_Announcements_published_at ON Announcements(published_at);
 GO
 
+-- ================= EmailOutbox =================
+-- Durable outbound email queue. Controllers INSERT here; the queue worker
+-- (utils/emailQueue.js) claims 'pending' rows with a row lock, sends via SMTP,
+-- and on failure backs off with exponential retry until max_attempts.
+IF OBJECT_ID('dbo.EmailOutbox', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.EmailOutbox (
+        id              INT IDENTITY(1,1) PRIMARY KEY,
+        recipient_email VARCHAR(255)  NOT NULL,
+        recipient_name  VARCHAR(120)  NULL,
+        subject         NVARCHAR(255) NOT NULL,
+        body_html       NVARCHAR(MAX) NOT NULL,
+        status          VARCHAR(20)   NOT NULL DEFAULT 'pending',
+        attempts        INT           NOT NULL DEFAULT 0,
+        max_attempts    INT           NOT NULL DEFAULT 5,
+        next_attempt_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        claimed_at      DATETIME2     NULL,
+        last_error      NVARCHAR(500) NULL,
+        sent_at         DATETIME2     NULL,
+        created_at      DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_EmailOutbox_status_next' AND object_id = OBJECT_ID('dbo.EmailOutbox'))
+    CREATE INDEX IX_EmailOutbox_status_next ON dbo.EmailOutbox(status, next_attempt_at);
+GO
+
 -- ================= SystemConfig =================
 IF OBJECT_ID('dbo.SystemConfig', 'U') IS NULL
 BEGIN

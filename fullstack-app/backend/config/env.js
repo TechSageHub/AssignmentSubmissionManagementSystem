@@ -47,6 +47,7 @@ module.exports = {
     password: process.env.EMAIL_PASSWORD,
     host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT, 10) || 587,
+    queueEnabled: process.env.EMAIL_QUEUE_ENABLED === 'true',
   },
   jwtSecret: process.env.JWT_SECRET,
   uploadPath: process.env.UPLOAD_PATH || 'uploads',
