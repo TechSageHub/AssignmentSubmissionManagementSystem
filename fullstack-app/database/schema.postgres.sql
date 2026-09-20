@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS EmailOutbox (
     created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS IX_EmailOutbox_due ON EmailOutbox(status, next_attempt_at.divide);
+CREATE INDEX IF NOT EXISTS IX_EmailOutbox_due ON EmailOutbox(status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS IX_EmailOutbox_created ON EmailOutbox(created_at);
 
 CREATE TABLE IF NOT EXISTS SystemConfig (

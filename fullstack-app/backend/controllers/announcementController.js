@@ -3,6 +3,7 @@ const notificationModel = require('../models/notification');
 const { sendAnnouncement } = require('../utils/emailHelper');
 const auditLog = require('../utils/auditLogger');
 const { getTargetFields } = require('../utils/academic');
+const { toStoredUtc } = require('../utils/dates');
 
 // Build the viewer's targeting context so level matching uses the same rules
 // as assignments (students compare their level, lecturers their level scope).
