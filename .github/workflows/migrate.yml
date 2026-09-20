@@ -1,0 +1,45 @@
+name: Migrate production DB
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "fullstack-app/database/**"
+      - "fullstack-app/backend/scripts/migrate.js"
+      - "fullstack-app/backend/config/db.js"
+      - ".github/workflows/migrate.yml"
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: fullstack-app/backend/package-lock.json
+
+      - run: npm ci
+        working-directory: fullstack-app/backend
+
+      - name: Run migrations against production Postgres
+        working-directory: fullstack-app/backend
+        env:
+          DB_TYPE: postgres
+          DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          DB_PORT: ${{ secrets.PROD_DB_PORT }}
+          DB_DATABASE: ${{ secrets.PROD_DB_DATABASE }}
+          DB_USER: ${{ secrets.PROD_DB_USER }}
+          DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          DB_SSL: "true"
+          # config/env.js requires these even for migrate — use prod secrets
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+          # optional — set to your prod value if you use them
+          EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+        run: node scripts/migrate.js
