@@ -25,6 +25,26 @@ jobs:
       - run: npm ci
         working-directory: fullstack-app/backend
 
+      - name: Check required secrets
+        env:
+          PROD_DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          PROD_DB_DATABASE: ${{ secrets.PROD_DB_DATABASE }}
+          PROD_DB_USER: ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+        run: |
+          missing=0
+          for v in PROD_DB_HOST PROD_DB_DATABASE PROD_DB_USER PROD_DB_PASSWORD; do
+            eval "val=\$$v"
+            if [ -z "$val" ]; then
+              echo "::error::Missing secret $v — set it in Settings → Secrets and variables → Actions"
+              missing=1
+            fi
+          done
+          if [ $missing -eq 1 ]; then
+            echo "::notice::Add the 4 secrets and re-run: Actions → Migrate production DB → Run workflow."
+            exit 1
+          fi
+
       - name: Run migrations against production Postgres
         working-directory: fullstack-app/backend
         env:
@@ -35,11 +55,10 @@ jobs:
           DB_USER: ${{ secrets.PROD_DB_USER }}
           DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
           DB_SSL: "true"
-          # config/env.js requires these even for migrate — use prod secrets
+          # env.js no longer requires JWT/email for migrate, but keep them if you set prod secrets
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
-          # optional — set to your prod value if you use them
           EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
         run: node scripts/migrate.js

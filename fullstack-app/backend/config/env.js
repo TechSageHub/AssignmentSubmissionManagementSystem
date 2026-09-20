@@ -3,14 +3,20 @@ require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const dbType = process.env.DB_TYPE || 'mssql';
 
+// migrate.js only needs DB creds — allow JWT/email to be absent when
+// running migrations (e.g. CI) so `npm run migrate` doesn't require prod secrets.
+const isMigrate = process.argv.some((a) => a.includes('migrate'));
+
 if (dbType === 'postgres') {
-  const required = ['DB_DATABASE', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET', 'EMAIL_FROM', 'EMAIL_PASSWORD', 'EMAIL_HOST'];
+  const required = ['DB_DATABASE', 'DB_USER', 'DB_PASSWORD'];
+  if (!isMigrate) required.push('JWT_SECRET', 'EMAIL_FROM', 'EMAIL_PASSWORD', 'EMAIL_HOST');
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 } else {
-  const required = ['DB_SERVER', 'DB_DATABASE', 'DB_USER', 'DB_PASSWORD', 'JWT_SECRET', 'EMAIL_FROM', 'EMAIL_PASSWORD', 'EMAIL_HOST'];
+  const required = ['DB_SERVER', 'DB_DATABASE', 'DB_USER', 'DB_PASSWORD'];
+  if (!isMigrate) required.push('JWT_SECRET', 'EMAIL_FROM', 'EMAIL_PASSWORD', 'EMAIL_HOST');
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
