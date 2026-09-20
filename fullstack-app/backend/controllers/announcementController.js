@@ -60,30 +60,33 @@ async function createAnnouncement(req, res, next) {
 
     auditLog.log(req, 'announcement', 'announcement', created.id, { title: created.title });
 
-    // Best-effort delivery to every matching user (in-app + email).
-    try {
-      const targetUsers = await announcementModel.findTargetUsers({
-        targetRole,
-        targetDepartment: targetDepartment || null,
-        targetLevel: targetLevel || null,
-      });
-      for (const u of targetUsers) {
-        try {
-          await notificationModel.create({
-            userId: u.id,
-            type: 'announcement',
-            title: 'New Announcement',
-            message: created.title,
-            link: '/announcements',
-          });
-        } catch { /* keep delivering to the rest */ }
-        await sendAnnouncement(u.email, u.name, created.title, trimmedMessage).catch(() => {});
-      }
-    } catch (deliveryErr) {
-      console.error('Failed to deliver announcement:', deliveryErr.message);
-    }
-
     res.status(201).json(created);
+
+    // Best-effort delivery to every matching user (in-app + email) — fire
+    // in the background so the HTTP response is not blocked on SMTP/DB fan-out.
+    setImmediate(async () => {
+      try {
+        const targetUsers = await announcementModel.findTargetUsers({
+          targetRole,
+          targetDepartment: targetDepartment || null,
+          targetLevel: targetLevel || null,
+        });
+        for (const u of targetUsers) {
+          try {
+            await notificationModel.create({
+              userId: u.id,
+              type: 'announcement',
+              title: 'New Announcement',
+              message: created.title,
+              link: '/announcements',
+            });
+          } catch { /* keep delivering to the rest */ }
+          await sendAnnouncement(u.email, u.name, created.title, trimmedMessage).catch(() => {});
+        }
+      } catch (deliveryErr) {
+        console.error('Failed to deliver announcement:', deliveryErr.message);
+      }
+    });
   } catch (err) {
     next(err);
   }

@@ -112,28 +112,35 @@ async function createAssignment(req, res, next) {
       publishDate,
     });
 
-    // Notify students matching lecturer's department and target level, but only
-    // when the assignment is visible to them right away.
-    if (!publishDate || parseInputDate(publishDate) <= new Date()) {
-      try {
-        const students = await userModel.findStudentsForAssignment({
-          department: req.user.department,
-          targetLevel: target_level || null,
-        });
-        const lecturerName = req.user.name;
-        const studentIds = students.map(s => s.id);
-        await notifyAssignmentCreated(studentIds, title, assignment.id);
-        for (const student of students) {
-          await sendAssignmentCreated(student.email, student.name, title, dueDateTime, lecturerName);
-        }
-      } catch (emailErr) {
-        console.error('Failed to send assignment notification emails:', emailErr.message);
-      }
-    }
-
     auditLog.log(req, 'create', 'assignment', assignment.id, { title });
 
     res.status(201).json(withUtcDueDate(assignment));
+
+    // Notify students matching lecturer's department and target level, but only
+    // when the assignment is visible to them right away — run in the background
+    // so the response is not blocked on SMTP fan-out.
+    if (!publishDate || parseInputDate(publishDate) <= new Date()) {
+      const dept = req.user.department;
+      const lvl = target_level || null;
+      const lecturerName = req.user.name;
+      const assignmentId = assignment.id;
+      const assignmentTitle = title;
+      setImmediate(async () => {
+        try {
+          const students = await userModel.findStudentsForAssignment({
+            department: dept,
+            targetLevel: lvl,
+          });
+          const studentIds = students.map(s => s.id);
+          await notifyAssignmentCreated(studentIds, assignmentTitle, assignmentId);
+          for (const student of students) {
+            await sendAssignmentCreated(student.email, student.name, assignmentTitle, dueDateTime, lecturerName).catch(() => {});
+          }
+        } catch (emailErr) {
+          console.error('Failed to send assignment notification emails:', emailErr.message);
+        }
+      });
+    }
   } catch (err) {
     next(err);
   }
