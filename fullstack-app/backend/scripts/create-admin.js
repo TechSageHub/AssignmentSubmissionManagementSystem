@@ -45,8 +45,8 @@ async function run() {
     } else {
       await query(
         `INSERT INTO Users (name, email, password_hash, role, username, is_verified, is_active, must_change_password)
-         VALUES (@name, @email, @passwordHash, 'admin', @username, 1, 1, 0)`,
-        { name, email, passwordHash, username: email.split('@')[0] }
+         VALUES (@name, @email, @passwordHash, 'admin', @username, @isVerified, @isActive, @mustChange)`,
+        { name, email, passwordHash, username: email.split('@')[0], isVerified: true, isActive: true, mustChange: false }
       );
       console.log(`Created new admin account "${email}".`);
     }
