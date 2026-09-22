@@ -47,7 +47,7 @@ if (process.env.RATE_LIMIT_TRUST_PROXY === 'true') {
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 const corsOptions = buildCorsOptions();
 app.use(corsOptions ? cors(corsOptions) : cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // Uploaded files are NEVER served statically. They are only streamed through the
 // authorized endpoint /api/submissions/:submissionId/file (see submissionController).

@@ -78,6 +78,9 @@ async function importUsers(req, res, next) {
     if (!Array.isArray(users) || users.length === 0) {
       return res.status(400).json({ error: 'ValidationError', details: 'No user rows provided' });
     }
+    if (users.length > 200) {
+      return res.status(400).json({ error: 'ValidationError', details: 'Import batch limited to 200 users' });
+    }
 
     let created = 0;
     const errors = [];

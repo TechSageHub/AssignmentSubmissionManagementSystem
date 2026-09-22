@@ -40,7 +40,12 @@ router.get('/email-queue', async (req, res, next) => {
 // Retry a row: reset it to due 'pending' so the worker picks it back up.
 router.post('/email-queue/:id/retry', async (req, res, next) => {
   try {
-    await emailOutbox.requeueStale();
+    const id = parseInt(req.params.id, 10);
+    if (!isNaN(id)) {
+      await emailOutbox.retryById(id);
+    } else {
+      await emailOutbox.requeueStale();
+    }
     const row = await emailOutbox.claimNext();
     res.json({ ok: true, requeued: !!row });
   } catch (err) { next(err); }

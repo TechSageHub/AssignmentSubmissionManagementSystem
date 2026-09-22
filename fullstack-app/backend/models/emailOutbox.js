@@ -87,6 +87,18 @@ async function requeueStale() {
   );
 }
 
+async function retryById(id) {
+  await query(
+    `UPDATE EmailOutbox
+        SET status = 'pending',
+            next_attempt_at = SYSUTCDATETIME(),
+            claimed_at = NULL,
+            last_error = NULL
+      WHERE id = @id AND status IN ('failed', 'sending', 'pending')`,
+    { id }
+  );
+}
+
 async function countByStatus() {
   const result = await query(
     `SELECT status, COUNT(*) AS cnt
@@ -110,4 +122,4 @@ async function listRecent(limit = 50) {
   return result.recordset;
 }
 
-module.exports = { enqueue, claimNext, markSent, markFailed, requeueStale, countByStatus, listRecent };
+module.exports = { enqueue, claimNext, markSent, markFailed, requeueStale, retryById, countByStatus, listRecent };
