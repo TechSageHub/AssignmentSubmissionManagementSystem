@@ -25,17 +25,19 @@ async function saveCriteria(assignmentId, criteria) {
   });
 }
 
+async function saveGradeCriteriaTx(exec, gradeId, criteriaScores) {
+  await exec('DELETE FROM GradeCriteria WHERE grade_id = @gradeId', { gradeId });
+  for (const cs of criteriaScores) {
+    await exec(
+      `INSERT INTO GradeCriteria (grade_id, criteria_id, score)
+       VALUES (@gradeId, @criteriaId, @score)`,
+      { gradeId, criteriaId: cs.criteriaId, score: cs.score }
+    );
+  }
+}
+
 async function saveGradeCriteria(gradeId, criteriaScores) {
-  await withTransaction(async ({ exec }) => {
-    await exec('DELETE FROM GradeCriteria WHERE grade_id = @gradeId', { gradeId });
-    for (const cs of criteriaScores) {
-      await exec(
-        `INSERT INTO GradeCriteria (grade_id, criteria_id, score)
-         VALUES (@gradeId, @criteriaId, @score)`,
-        { gradeId, criteriaId: cs.criteriaId, score: cs.score }
-      );
-    }
-  });
+  await withTransaction(async ({ exec }) => saveGradeCriteriaTx(exec, gradeId, criteriaScores));
 }
 
 async function findByGrade(gradeId) {
@@ -50,4 +52,4 @@ async function findByGrade(gradeId) {
   return result.recordset;
 }
 
-module.exports = { findByAssignment, saveCriteria, saveGradeCriteria, findByGrade };
+module.exports = { findByAssignment, saveCriteria, saveGradeCriteria, saveGradeCriteriaTx, findByGrade };

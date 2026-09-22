@@ -100,6 +100,17 @@ async function reject(id, lecturerComment) {
 
 // Close an appeal as accepted after the grade has been updated. Guarded so a
 // concurrent resolution can't double-close.
+async function resolveAcceptedTx(exec, id, { lecturerComment, oldScore, newScore }) {
+  const result = await exec(
+    `UPDATE GradeAppeals
+     SET status = 'accepted', lecturer_comment = @lecturerComment,
+         old_score = @oldScore, new_score = @newScore, resolved_at = GETDATE()
+     WHERE id = @id AND status = 'open'`,
+    { id, lecturerComment, oldScore, newScore }
+  );
+  return result.rowsAffected[0] > 0;
+}
+
 async function resolveAccepted(id, { lecturerComment, oldScore, newScore }) {
   const result = await query(
     `UPDATE GradeAppeals
@@ -132,5 +143,6 @@ module.exports = {
   findByLecturer,
   reject,
   resolveAccepted,
+  resolveAcceptedTx,
   countOpenByLecturer,
 };

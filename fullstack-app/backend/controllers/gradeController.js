@@ -9,6 +9,7 @@ const { notifyGradeReleased, notifyAppealResolved } = require('../utils/notifica
 const auditLog = require('../utils/auditLogger');
 const { assertSubmissionAssignmentOwner, assertSubmissionReadAccess } = require('../utils/authorization');
 const { parseInputDate, toStoredUtc } = require('../utils/dates');
+const { withTransaction } = require('../config/db');
 
 // Resolve grade release timing. 'now' (default) releases immediately, 'schedule'
 // defers to a chosen instant, 'hold' keeps the grade hidden from students.
@@ -109,29 +110,35 @@ async function gradeSubmission(req, res, next) {
       weightedScore = Math.round(total * 100) / 100;
     }
 
-    const grade = await gradeModel.upsert({
-      submissionId,
-      score: weightedScore ?? numericScore,
-      feedback: feedback || null,
-      releasedAt,
-    });
     const finalScore = weightedScore ?? numericScore;
-
-    // Save per-criterion scores if provided
-    if (validatedCriteria.length > 0) {
-      await rubricModel.saveGradeCriteria(grade.id, validatedCriteria);
-    }
-
+    let grade;
+    await withTransaction(async ({ exec }) => {
+      grade = await gradeModel.upsertTx(exec, {
+        submissionId,
+        score: finalScore,
+        feedback: feedback || null,
+        releasedAt,
+      });
+      if (validatedCriteria.length > 0) {
+        await rubricModel.saveGradeCriteriaTx(exec, grade.id, validatedCriteria);
+      }
+      if (openAppeal) {
+        const appealComment = typeof req.body.appealComment === 'string' ? req.body.appealComment.trim() : '';
+        const resolved = await gradeAppealModel.resolveAcceptedTx(exec, openAppeal.id, {
+          lecturerComment: appealComment || null,
+          oldScore,
+          newScore: finalScore,
+        });
+        if (!resolved) {
+          const err = new Error('This appeal has already been resolved');
+          err.status = 409;
+          err.name = 'ConflictError';
+          throw err;
+        }
+      }
+    });
     if (openAppeal) {
       const appealComment = typeof req.body.appealComment === 'string' ? req.body.appealComment.trim() : '';
-      const resolved = await gradeAppealModel.resolveAccepted(openAppeal.id, {
-        lecturerComment: appealComment || null,
-        oldScore,
-        newScore: finalScore,
-      });
-      if (!resolved) {
-        return res.status(409).json({ error: 'ConflictError', details: 'This appeal has already been resolved' });
-      }
       auditLog.log(req, 'appeal_accept', 'submission', submissionId, {
         appealId: openAppeal.id,
         oldScore,
