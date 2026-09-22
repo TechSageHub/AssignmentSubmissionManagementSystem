@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import api from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,10 @@ interface CreateUserDialogProps {
 }
 
 export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onCreated }: CreateUserDialogProps) {
+  const { user: currentUser } = useAuth()
+  const isLecturerCreator = currentUser?.role === 'lecturer' && allowedRoles.length === 1 && allowedRoles[0] === 'student'
+  const lecturerDept = isLecturerCreator ? (currentUser?.department || '') : ''
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>(allowedRoles[0])
@@ -39,7 +44,15 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const effectiveDepartment = selectedDept === 'OTHER' ? customDept.trim() : selectedDept
+  const effectiveDepartment = isLecturerCreator && lecturerDept
+    ? lecturerDept
+    : selectedDept === 'OTHER' ? customDept.trim() : selectedDept
+
+  useEffect(() => {
+    if (isLecturerCreator && lecturerDept && open) {
+      setSelectedDept(lecturerDept)
+    }
+  }, [isLecturerCreator, lecturerDept, open])
 
   const reset = () => {
     setName(''); setEmail(''); setRole(allowedRoles[0])
@@ -166,23 +179,32 @@ export default function CreateUserDialog({ open, onOpenChange, allowedRoles, onC
 
           <div className="space-y-1.5">
             <Label htmlFor="cu-dept">Department</Label>
-            <Select value={selectedDept} onValueChange={setSelectedDept}>
-              <SelectTrigger id="cu-dept"><SelectValue placeholder="Select department" /></SelectTrigger>
-              <SelectContent>
-                {DEPARTMENTS.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
-                <SelectItem value="OTHER">Other (Specify manually)</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedDept === 'OTHER' && (
-              <Input
-                className="mt-1.5"
-                value={customDept}
-                onChange={(e) => setCustomDept(e.target.value)}
-                placeholder="Type department name..."
-                required
-              />
+            {isLecturerCreator && lecturerDept ? (
+              <>
+                <Input id="cu-dept" value={lecturerDept} disabled />
+                <p className="text-xs text-muted-foreground">Students you create are automatically assigned to your department ({lecturerDept}).</p>
+              </>
+            ) : (
+              <>
+                <Select value={selectedDept} onValueChange={setSelectedDept}>
+                  <SelectTrigger id="cu-dept"><SelectValue placeholder="Select department" /></SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((d) => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
+                    ))}
+                    <SelectItem value="OTHER">Other (Specify manually)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {selectedDept === 'OTHER' && (
+                  <Input
+                    className="mt-1.5"
+                    value={customDept}
+                    onChange={(e) => setCustomDept(e.target.value)}
+                    placeholder="Type department name..."
+                    required
+                  />
+                )}
+              </>
             )}
           </div>
 

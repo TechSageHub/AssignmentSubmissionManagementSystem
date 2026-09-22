@@ -49,7 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await api.post('/auth/login', credentials)
     const loggedInUser = {
       id: data.id, name: data.name, email: data.email, username: data.username,
-      role: data.role, mustChangePassword: !!data.mustChangePassword,
+      role: data.role, department: data.department, level_scope: data.level_scope, levelScope: data.level_scope,
+      mustChangePassword: !!data.mustChangePassword,
     }
     localStorage.setItem('token', data.token)
     localStorage.setItem('user', JSON.stringify(loggedInUser))

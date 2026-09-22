@@ -9,9 +9,13 @@ const auditLog = require('../utils/auditLogger');
 const ALLOWED_ROLES = ['student', 'lecturer', 'admin'];
 
 // Shared provisioning logic used by the single-create endpoint and CSV import.
-// `creatorRole` enforces authorization (lecturers may only create students).
+// `creator` enforces authorization (lecturers may only create students) and
+// automatically scopes the new student's department to the lecturer's own
+// department. Accepts either a role string (legacy) or the full req.user object.
 // Returns the created user record. Throws { status, details } on validation failure.
-async function provisionUser({ name, email, password, role, username, studentId, staffId, department, programme, level, phone, levelScope, level_scope }, creatorRole) {
+async function provisionUser({ name, email, password, role, username, studentId, staffId, department, programme, level, phone, levelScope, level_scope }, creator) {
+  const creatorRole = typeof creator === 'string' ? creator : creator?.role;
+  const creatorDept = typeof creator === 'object' && creator?.department ? String(creator.department).trim() : null;
   if (!name || !email || !role) {
     throw { status: 400, details: 'Name, email and role are required' };
   }
@@ -29,6 +33,10 @@ async function provisionUser({ name, email, password, role, username, studentId,
   }
   if (creatorRole === 'lecturer' && role !== 'student') {
     throw { status: 403, details: 'Lecturers can only create student accounts' };
+  }
+  // Lecturers automatically create students in their own department (AGENTS.md: lecturer scope).
+  if (creatorRole === 'lecturer' && creatorDept) {
+    department = creatorDept;
   }
 
   const existing = await userModel.findByEmail(email);
@@ -131,7 +139,7 @@ async function updateProfile(req, res, next) {
 // POST /users — admin or lecturer creates a single account.
 async function createUser(req, res, next) {
   try {
-    const user = await provisionUser(req.body, req.user.role);
+    const user = await provisionUser(req.body, req.user);
     auditLog.log(req, 'create_user', 'user', user.id, { role: req.body.role, email: req.body.email });
     res.status(201).json({
       id: user.id,

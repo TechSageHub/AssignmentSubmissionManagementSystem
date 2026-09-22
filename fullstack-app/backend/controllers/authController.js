@@ -42,6 +42,8 @@ async function login(req, res, next) {
       email: user.email,
       username: user.username,
       role: user.role,
+      department: user.department || null,
+      level_scope: user.level_scope || null,
       mustChangePassword: user.must_change_password === true || user.must_change_password === 1,
       token,
     });

@@ -89,8 +89,9 @@ async function importUsers(req, res, next) {
         const row = { ...users[i] };
         if (req.user.role === 'lecturer') {
           row.role = 'student';
+          if (req.user.department) row.department = req.user.department;
         }
-        await provisionUser(row, req.user.role);
+        await provisionUser(row, req.user);
         created++;
       } catch (err) {
         // Only surface controlled validation details from provisionUser; never
