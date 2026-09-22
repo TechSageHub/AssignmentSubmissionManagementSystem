@@ -11,7 +11,26 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { ErrorState } from '@/components/PageState'
 import FilePreview from '@/components/FilePreview'
-import { ArrowLeft, FileText, Award, MessageSquare, Eye } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { ArrowLeft, FileText, Award, MessageSquare, Eye, MessageSquareWarning } from 'lucide-react'
+import { toast } from 'sonner'
+
+interface GradeData {
+  score: number | null
+  feedback: string | null
+  status?: string
+  released?: boolean
+  released_at?: string | null
+  criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number; weight?: number | null }[]
+  appeal?: {
+    id: number
+    reason: string
+    status: 'open' | 'accepted' | 'rejected'
+    lecturer_comment: string | null
+    requested_at: string
+  } | null
+}
 
 export default function ViewSubmissionPage() {
   usePageTitle('Submission')
@@ -27,10 +46,13 @@ export default function ViewSubmissionPage() {
     submitted_at: string
     is_late: boolean
     files?: Array<{ id: number; original_name: string; file_path: string }>
-    grade?: { score: number | null; feedback: string | null; status?: string; released?: boolean; released_at?: string | null; criteria_scores?: { criteria_id: number; name: string; max_score: number; score: number; weight?: number | null }[] }
+    grade?: GradeData
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [appealOpen, setAppealOpen] = useState(false)
+  const [appealReason, setAppealReason] = useState('')
+  const [appealSaving, setAppealSaving] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,6 +71,26 @@ export default function ViewSubmissionPage() {
     }
     fetchData()
   }, [submissionId, navigate])
+
+  const handleAppeal = async () => {
+    if (!appealReason.trim()) {
+      toast.error('Please explain why you are appealing this grade')
+      return
+    }
+    setAppealSaving(true)
+    try {
+      await api.post('/appeals', { submissionId: Number(submissionId), reason: appealReason })
+      toast.success('Appeal submitted')
+      setAppealOpen(false)
+      setAppealReason('')
+      window.location.reload()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { details?: string } } })?.response?.data?.details
+      toast.error(msg || 'Failed to submit appeal')
+    } finally {
+      setAppealSaving(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -203,6 +245,24 @@ export default function ViewSubmissionPage() {
                         <p className="text-sm">{submission.grade.feedback}</p>
                       </div>
                     </>
+                  )}
+
+                  {submission.grade.appeal ? (
+                    <div className="rounded-lg border-l-4 border-amber-400 bg-muted/40 p-3">
+                      <p className="text-sm font-medium flex items-center gap-1.5 text-amber-600">
+                        <MessageSquareWarning className="h-4 w-4" />
+                        Appeal {submission.grade.appeal.status}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{submission.grade.appeal.reason}</p>
+                      {submission.grade.appeal.lecturer_comment && (
+                        <p className="text-xs mt-2 text-muted-foreground italic">&ldquo;{submission.grade.appeal.lecturer_comment}&rdquo;</p>
+                      )}
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => setAppealOpen(true)}>
+                      <MessageSquareWarning className="h-4 w-4" />
+                      Appeal this grade
+                    </Button>
                   )}
                 </div>
               ) : submission.grade?.released === false && submission.grade.status === 'withheld' ? (

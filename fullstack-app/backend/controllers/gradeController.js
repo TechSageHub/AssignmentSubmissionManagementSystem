@@ -1,10 +1,11 @@
 const submissionModel = require('../models/submission');
 const gradeModel = require('../models/grade');
+const gradeAppealModel = require('../models/gradeAppeal');
 const rubricModel = require('../models/rubric');
 const groupMemberModel = require('../models/groupMember');
 const userModel = require('../models/user');
-const { sendGradeReleased } = require('../utils/emailHelper');
-const { notifyGradeReleased } = require('../utils/notificationHelper');
+const { sendGradeReleased, sendAppealResolved } = require('../utils/emailHelper');
+const { notifyGradeReleased, notifyAppealResolved } = require('../utils/notificationHelper');
 const auditLog = require('../utils/auditLogger');
 const { assertSubmissionAssignmentOwner, assertSubmissionReadAccess } = require('../utils/authorization');
 const { parseInputDate, toStoredUtc } = require('../utils/dates');
@@ -56,6 +57,31 @@ async function gradeSubmission(req, res, next) {
     }
     const releasedAt = resolveReleaseTime(releaseMode, req.body.release_at);
 
+    // Optional appeal resolution: when an open appeal is being acted on, capture
+    // the old score before the upsert and resolve the appeal after the grade is saved.
+    let openAppeal = null;
+    let oldScore = null;
+    const rawAppealId = req.body.appealId;
+    if (rawAppealId != null && rawAppealId !== '') {
+      const appealId = parseInt(rawAppealId, 10);
+      if (isNaN(appealId)) {
+        return res.status(400).json({ error: 'ValidationError', details: 'Invalid appeal ID' });
+      }
+      const appeal = await gradeAppealModel.findById(appealId);
+      if (!appeal) {
+        return res.status(404).json({ error: 'NotFoundError', details: 'Appeal not found' });
+      }
+      if (appeal.submission_id !== submissionId) {
+        return res.status(400).json({ error: 'ValidationError', details: 'Appeal does not match this submission' });
+      }
+      if (appeal.status !== 'open') {
+        return res.status(409).json({ error: 'ConflictError', details: 'This appeal has already been resolved' });
+      }
+      const existingGrade = await gradeModel.findBySubmission(submissionId);
+      oldScore = existingGrade ? Number(existingGrade.score) : null;
+      openAppeal = appeal;
+    }
+
     // Validate per-criterion scores against the assignment's rubric so grades
     // can't reference foreign criteria or exceed each criterion's maximum.
     // When criteria scores are supplied the overall score is derived from
@@ -94,6 +120,33 @@ async function gradeSubmission(req, res, next) {
     // Save per-criterion scores if provided
     if (validatedCriteria.length > 0) {
       await rubricModel.saveGradeCriteria(grade.id, validatedCriteria);
+    }
+
+    if (openAppeal) {
+      const appealComment = typeof req.body.appealComment === 'string' ? req.body.appealComment.trim() : '';
+      const resolved = await gradeAppealModel.resolveAccepted(openAppeal.id, {
+        lecturerComment: appealComment || null,
+        oldScore,
+        newScore: finalScore,
+      });
+      if (!resolved) {
+        return res.status(409).json({ error: 'ConflictError', details: 'This appeal has already been resolved' });
+      }
+      auditLog.log(req, 'appeal_accept', 'submission', submissionId, {
+        appealId: openAppeal.id,
+        oldScore,
+        newScore: finalScore,
+        comment: appealComment || null,
+      });
+      const student = await userModel.findByIdWithEmail(submission.student_id);
+      if (student) {
+        try {
+          await sendAppealResolved(student.email, student.name, submission.assignment_title, 'accepted', appealComment || null);
+        } catch (emailErr) {
+          console.error('Failed to send appeal-resolved email:', emailErr.message);
+        }
+      }
+      await notifyAppealResolved(submission.student_id, submission.assignment_title, 'accepted', submissionId);
     }
 
     const releasedNow = releasedAt != null && parseInputDate(releasedAt) <= new Date();
@@ -219,7 +272,12 @@ async function getGrade(req, res, next) {
       });
     }
 
-    res.json({ ...grade, released: isReleased, criteria_scores: criteriaScores });
+    let appeal = null;
+    if (req.user.role === 'lecturer' || (req.user.role === 'student' && submission.student_id === req.user.id)) {
+      appeal = await gradeAppealModel.findBySubmission(submissionId);
+    }
+
+    res.json({ ...grade, released: isReleased, criteria_scores: criteriaScores, appeal });
   } catch (err) {
     next(err);
   }

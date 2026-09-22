@@ -204,6 +204,27 @@ IF COL_LENGTH('dbo.Grades', 'released_at') IS NULL
     ALTER TABLE Grades ADD released_at DATETIME2 NULL;
 GO
 
+-- ================= Grade Appeals =================
+IF OBJECT_ID('dbo.GradeAppeals', 'U') IS NULL
+BEGIN
+    CREATE TABLE GradeAppeals (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        submission_id INT NOT NULL UNIQUE,
+        student_id INT NOT NULL,
+        reason NVARCHAR(MAX) NOT NULL,
+        status NVARCHAR(20) NOT NULL DEFAULT 'open', -- open|accepted|rejected
+        lecturer_comment NVARCHAR(MAX),
+        old_score DECIMAL(5,2),
+        new_score DECIMAL(5,2),
+        requested_at DATETIME2 DEFAULT GETDATE(),
+        resolved_at DATETIME2,
+        CONSTRAINT FK_GradeAppeals_Submission FOREIGN KEY (submission_id) REFERENCES Submissions(id) ON DELETE CASCADE,
+        CONSTRAINT FK_GradeAppeals_User FOREIGN KEY (student_id) REFERENCES Users(id)
+    );
+    CREATE INDEX IX_GradeAppeals_status ON GradeAppeals (status);
+END
+GO
+
 -- ================= Rubrics =================
 IF OBJECT_ID('dbo.RubricCriteria', 'U') IS NULL
 BEGIN

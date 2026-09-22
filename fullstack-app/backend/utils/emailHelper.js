@@ -122,10 +122,48 @@ async function sendAnnouncement(studentEmail, studentName, announcementTitle, me
   });
 }
 
+async function sendAppealFiled(lecturerEmail, lecturerName, studentName, assignmentTitle, reason) {
+  await sendOrEnqueue({
+    to: lecturerEmail,
+    recipientName: lecturerName,
+    subject: `Grade appeal: ${escapeHtml(assignmentTitle)}`,
+    html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #6366f1;">Grade Appeal</h2>
+      <p>Hi <strong>${escapeHtml(lecturerName)}</strong>,</p>
+      <p><strong>${escapeHtml(studentName)}</strong> has appealed their grade for <strong>${escapeHtml(assignmentTitle)}</strong>.</p>
+      <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #6366f1;">
+        <p style="margin: 0; white-space: pre-wrap;">${escapeHtml(reason)}</p>
+      </div>
+      <p><a href="${baseUrl}/appeals" style="background: #6366f1; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none;">Review Appeal</a></p>
+      <p style="color: #94a3b8; font-size: 12px;">You are receiving this because you are registered on ASMS.</p>
+    </div>`,
+  });
+}
+
+async function sendAppealResolved(studentEmail, studentName, assignmentTitle, outcome, note) {
+  await sendOrEnqueue({
+    to: studentEmail,
+    recipientName: studentName,
+    subject: `Appeal ${outcome}: ${escapeHtml(assignmentTitle)}`,
+    html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: ${outcome === 'accepted' ? '#22c55e' : '#ef4444'};">Appeal ${outcome === 'accepted' ? 'Accepted' : 'Rejected'}</h2>
+      <p>Hi <strong>${escapeHtml(studentName)}</strong>,</p>
+      <p>Your appeal for <strong>${escapeHtml(assignmentTitle)}</strong> has been ${outcome === 'accepted' ? 'accepted and re-graded' : 'reviewed'}. Please log in to view the outcome.</p>
+      ${note ? `<div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid ${outcome === 'accepted' ? '#22c55e' : '#ef4444'};">
+        <p style="margin: 0; white-space: pre-wrap;">${escapeHtml(note)}</p>
+      </div>` : ''}
+      <p><a href="${baseUrl}/my-submissions" style="background: #6366f1; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none;">View Result</a></p>
+      <p style="color: #94a3b8; font-size: 12px;">You are receiving this because you are registered on ASMS.</p>
+    </div>`,
+  });
+}
+
 module.exports = {
   sendAssignmentCreated,
   sendSubmissionConfirmation,
   sendGradeReleased,
   sendDeadlineReminder,
   sendAnnouncement,
+  sendAppealFiled,
+  sendAppealResolved,
 };

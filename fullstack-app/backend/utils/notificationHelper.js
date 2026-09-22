@@ -46,4 +46,32 @@ async function notifyGradeReleased(userIds, assignmentTitle, submissionId) {
   }
 }
 
-module.exports = { notifyAssignmentCreated, notifySubmissionConfirmed, notifyGradeReleased };
+async function notifyAppealFiled(lecturerId, assignmentTitle, appealId) {
+  try {
+    await notificationModel.create({
+      userId: lecturerId,
+      type: 'appeal_filed',
+      title: 'Grade Appeal',
+      message: `A student has appealed their grade for "${assignmentTitle}". Review the appeal.`,
+      link: `/appeals?s=open`,
+    });
+  } catch (err) {
+    console.error('Failed to create notification:', err.message);
+  }
+}
+
+async function notifyAppealResolved(studentId, assignmentTitle, outcome, submissionId) {
+  try {
+    await notificationModel.create({
+      userId: studentId,
+      type: 'appeal_resolved',
+      title: 'Appeal Decided',
+      message: `Your appeal for "${assignmentTitle}" was ${outcome}. Check your results.`,
+      link: `/submissions/${submissionId}`,
+    });
+  } catch (err) {
+    console.error('Failed to create notification:', err.message);
+  }
+}
+
+module.exports = { notifyAssignmentCreated, notifySubmissionConfirmed, notifyGradeReleased, notifyAppealFiled, notifyAppealResolved };

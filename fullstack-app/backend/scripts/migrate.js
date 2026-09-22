@@ -25,7 +25,8 @@ const migrations = dbType === 'postgres'
       'migration_018_add_grade_release.postgres.sql',
       'migration_019_add_rubric_weight.postgres.sql',
       'migration_020_add_announcements.postgres.sql',
-  'migration_021_add_email_outbox.postgres.sql',
+      'migration_021_add_email_outbox.postgres.sql',
+      'migration_022_add_grade_appeals.postgres.sql',
     ]
   : [
       'migration_001_add_verification.sql',
@@ -49,6 +50,7 @@ const migrations = dbType === 'postgres'
       'migration_019_add_rubric_weight.sql',
       'migration_020_add_announcements.sql',
   'migration_021_add_email_outbox.sql',
+      'migration_022_add_grade_appeals.sql',
     ];
 
 function splitStatements(sql) {

@@ -4,57 +4,55 @@ Full-stack assignment-management app. React 19 + Vite + Tailwind 4 frontend, Exp
 
 ## Commands
 
-Run everything from the package dirs — `npm install` at the root is unrelated to the real app.
+Run from package dirs — root `package.json` is not the app (Vercel fallback only).
 
 ```bash
 # backend (port 5000, nodemon)
 cd fullstack-app/backend && npm run dev
-# ngrok helpers (backend dir); NGROK_URL is auto-added to CORS and /api/config
+# ngrok (backend dir) — NGROK_URL auto-added to CORS and GET /api/config
 cd fullstack-app/backend && npm run dev:ngrok
-# frontend (port 5173; vite proxies /api -> localhost:5000)
+# frontend (port 5173; Vite proxies /api -> localhost:5000)
 cd fullstack-app/frontend && npm run dev
-# migrations (backend dir; idempotent schema + journaled migrations, fails loudly)
+# migrations — idempotent schema + journaled migrations, fails loudly
 cd fullstack-app/backend && npm run migrate
-# tests: Node builtin runner, from backend dir (`npm test` === `node --test`)
-cd fullstack-app/backend && node --test
-# frontend tests: vitest (api cache layer), from frontend dir
+# backend tests: Node builtin runner (npm test === node --test)
+cd fullstack-app/backend && node --test          # single: node --test --test-name-pattern="convertPgSql"
+# frontend tests: Vitest (api cache layer)
 cd fullstack-app/frontend && npm test
-# build frontend (backend serves frontend/dist as SPA in prod)
-cd fullstack-app/frontend && npm run build
+# typecheck + build (backend serves frontend/dist as SPA in prod)
+cd fullstack-app/frontend && npm run build       # runs tsc -b && vite build
 ```
 
-`npm run lint` (frontend) currently fails repo-wide on pre-existing errors (react-hooks set-state-in-effect, no-explicit-any). Don't treat it as a merge gate. Verify with `tsc`/`npm run build` instead.
+`npm run lint` (frontend) fails on pre-existing errors — not a merge gate. Use `npm run build` / `tsc -b` instead.
 
 ## Layout
 
-- `fullstack-app/backend/` — Express app, single entry `index.js`. CommonJS. Routes in `routes/`, SQL in `models/`, handlers in `controllers/`, DB translation in `config/db.js`.
-- `fullstack-app/frontend/` — React SPA. Routes in `src/App.tsx`. Path alias `@/` → `src`. shadcn/ui components in `src/components/ui`.
-- `fullstack-app/database/` — twin SQL dialects, kept in sync by hand: `*.sql` (mssql) and `*.postgres.sql` (Postgres). `migrate.js` picks by `DB_TYPE`.
-- `api/index.js` — re-exports the backend Express app for Vercel serverless; `vercel.json` rewrites `/api/*` → `/api`.
-- `fullstack-app/.continuation.md` — session log with recent-work context; read for history, not as source of truth.
+- `fullstack-app/backend/` — Express, entry `index.js` (CommonJS, not ESM). Routes `routes/`, handlers `controllers/`, SQL `models/`, DB translation `config/db.js`.
+- `fullstack-app/frontend/` — React SPA, routes in `src/App.tsx`, path alias `@/` → `src`, shadcn/ui in `src/components/ui`.
+- `fullstack-app/database/` — twin dialects by hand: `*.sql` (mssql) + `*.postgres.sql` (Postgres). `scripts/migrate.js` picks by `DB_TYPE`.
+- `fullstack-app/render.yaml` — Render blueprint (Postgres + web service, healthCheck `/api/config`).
+- `api/index.js` — re-exports backend app for Vercel; `vercel.json` rewrites `/api/*` → `/api`, rest → SPA.
+- `fullstack-app/.continuation.md` — session log, not source of truth.
 
 ## Env & DB
 
-- `fullstack-app/backend/.env` is REQUIRED even for unit tests: `config/env.js` throws if DB creds + `JWT_SECRET` + `EMAIL_FROM`/`EMAIL_PASSWORD`/`EMAIL_HOST` are missing. Copy from `.env.example`; file is gitignored.
-- **DB is dual-dialect.** Models write T-SQL (named `@params`, bracketed `[idents]`, `GETDATE()`, `OUTPUT INSERTED.*`); `convertPgSql()` in `config/db.js` rewrites it to Postgres at runtime (`$n` params, `"quoted"` idents, `NOW()`, `RETURNING`, bit `1/0`→`true/false`). Write every new query T-SQL-flavored; it must run clean on both DBs.
-- Bracket identifiers (`[column]`) are case-preserving in Postgres: must match the schema case; unbracketed names are lowercased. New columns: add to BOTH dialect schema files + BOTH migration files.
-- New columns often use the `isMissingColumnError` probe pattern in models to degrade gracefully on partially-migrated DBs — keep it.
+- `fullstack-app/backend/.env` REQUIRED even for unit tests — tests import `models` → `config/db` → `config/env.js` which throws if `DB_*` + `JWT_SECRET` + `EMAIL_FROM`/`EMAIL_PASSWORD`/`EMAIL_HOST` missing. Copy from `.env.example`. Exception: `npm run migrate` only needs DB creds (`env.js` skips JWT/email when argv contains `migrate`).
+- **Dual-dialect.** Write every query as T-SQL (`@params`, `[idents]`, `GETDATE()`/`SYSUTCDATETIME()`, `OUTPUT INSERTED.*`); `convertPgSql()` in `config/db.js:56` rewrites at runtime for Postgres (`$n`, `"quoted"`, `NOW()`, `RETURNING`, `1/0`→`true/false`, `OFFSET/FETCH`→`LIMIT/OFFSET`). Bracketed idents `[col]` are case-preserving in Postgres — must match schema case.
+- New columns: add to BOTH schema files + BOTH migration files. Use `isMissingColumnError` probe pattern in models (see `models/user.js:20`, `models/assignment.js:64`) to degrade on partially-migrated DBs.
+- `config/db.js` exposes `query(sql, params)`, `withTransaction(fn)` (fn receives `{exec}` bound to tx), `isConnectionError`/`isDuplicateKeyError` (retry only on connection errors, never on duplicate-key).
+- Dates: `utils/dates.js` — DB stores naive UTC wall-clock (`DATETIME2`/`TIMESTAMP` without zone, written via `toStoredUtc()` stripping `Z`), API emits ISO `Z` via `toIsoUtc()`. Comparisons use `SYSUTCDATETIME()`/`NOW()` (both UTC). Treat bare `YYYY-MM-DDTHH:mm` inputs as UTC.
 
-## Ops notes
+## Ops & Storage
 
-- Bootstrapping an admin: seeded admin can't log in (placeholder hash). Run from backend dir:
-  `$env:ADMIN_EMAIL="..."; $env:ADMIN_PASSWORD="..."; npm run create-admin`
-  (idempotent; resets password/role if the email exists).
-- `migrate.js` is fail-loud: per-statement errors abort with exit 1. It records applied migration files in a `SchemaMigrations` journal table and skips already-applied ones; the schema files (mssql `schema.sql`, `schema.postgres.sql`) are authoritative + idempotent and re-run every time as the baseline. Postgres runs only `schema.postgres.sql` + the `*.postgres.sql` migrations (008–021); migrations 001-007 are T-SQL only (the PG schema file covers those changes). New table/column changes go into the schema files AND new guarded migrations (an mssql one, plus a `*.postgres.sql` twin for PG).
-- Prod serves `frontend/dist` from the backend; uploads live at `backend/uploads/assignments/:id/` (gitignored) and are NEVER served statically — files stream only through the authorized `GET /api/submissions/:submissionId/file` endpoint, `/uploads/*` returns 404.
-- File storage (`services/storage.js`): when `S3_BUCKET` is set, files go to S3-compatible object storage; otherwise they persist in the `StorageBlobs` DB table (BYTEA/VARBINARY) with a best-effort dual-write to local `uploads/`. Multer uses memory storage — never read submissions from disk directly, go through the storage service.
-- Deploy: `render.yaml` blueprint (Postgres + web service). After deploy: run migrations in Render shell, then `create-admin`. Vercel skips all background jobs (cron reminders + email-outbox queue) via the `VERCEL !== '1'` guard in `index.js`.
+- Bootstrap admin (seeded admin has placeholder hash): `cd fullstack-app/backend && $env:ADMIN_EMAIL="..."; $env:ADMIN_PASSWORD="..."; npm run create-admin` (idempotent, resets password/role).
+- `scripts/migrate.js` — schema files are authoritative + idempotent (re-run every time). Migrations are journaled in `SchemaMigrations` and skipped if applied. Postgres runs `schema.postgres.sql` + `*.postgres.sql` 008–022; mssql runs `schema.sql` + 001–022. New migration must be appended to the hardcoded arrays in `migrate.js` or it never runs. CI workflow `.github/workflows/migrate.yml` runs on `database/**` changes.
+- Prod serves `frontend/dist` from backend (`backend/index.js:94`). `VERCEL !== '1'` guard skips cron (`reminderService`) + `emailQueue` on Vercel.
+- Uploads: `backend/uploads/assignments/:id/` is gitignored and NEVER served statically (`/uploads/*` → 404 in `index.js:54`). Files stream only via `GET /api/submissions/:submissionId/file` (auth: own/group or lecturer's assignment). Multer uses memory storage.
+- `services/storage.js` — if `S3_BUCKET` set, files go to S3/R2 (`S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`); else persisted in `StorageBlobs` (`BYTEA`/`VARBINARY`) with best-effort dual-write to local `uploads/`. Never read submissions from disk directly — use `storage.createReadStream`/`storeFile`.
 
-## Frontend data layer
+## Frontend & API Conventions
 
-`src/services/api.ts` wraps axios with a 60s GET cache (`readApiCache`/`writeApiCache`); every mutation clears the whole cache; a 401 clears auth and redirects to `/login`. Use the cache helpers when adding list pages; do not add per-request caching on top.
-
-## API conventions
-
-- `GET /api/admin/users` is paginated + searchable (`?limit&offset&search`, limit capped at 200) and returns `{ items, total, limit, offset }` — not a bare array. New admin list endpoints should follow this shape.
-- Error responses are `{ error: <Name>, details: <message> }`; global handler in `index.js` caps details at 500 chars and hides 5xx messages in production.
+- `src/services/api.ts` — axios with 60s GET cache (`readApiCache`/`writeApiCache`); every `POST/PUT/PATCH/DELETE` clears entire cache; 401 clears auth and redirects to `/login` (except `/auth/login`). Reuse cache helpers for new list pages.
+- `GET /api/admin/users` is paginated+searchable (`?limit&offset&search`, limit cap 200) → `{ items, total, limit, offset }` not bare array. New admin lists must follow this shape.
+- Error shape: `{ error: <Name>, details: <message> }`; global handler `index.js:102` caps details at 500 chars, hides 5xx in production.
+- CORS: `CORS_ORIGINS` (comma-separated) + `FRONTEND_URL` + `NGROK_URL` + localhost dev ports; if empty, permissive (warns). `RATE_LIMIT_TRUST_PROXY=true` behind proxy.

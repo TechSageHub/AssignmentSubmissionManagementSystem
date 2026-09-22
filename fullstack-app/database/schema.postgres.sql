@@ -117,6 +117,21 @@ CREATE TABLE IF NOT EXISTS Grades (
 
 ALTER TABLE Grades ADD COLUMN IF NOT EXISTS released_at TIMESTAMP;
 
+CREATE TABLE IF NOT EXISTS GradeAppeals (
+    id SERIAL PRIMARY KEY,
+    submission_id INT NOT NULL UNIQUE REFERENCES Submissions(id) ON DELETE CASCADE,
+    student_id INT NOT NULL REFERENCES Users(id),
+    reason TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    lecturer_comment TEXT,
+    old_score DECIMAL(5,2),
+    new_score DECIMAL(5,2),
+    requested_at TIMESTAMP DEFAULT NOW(),
+    resolved_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS IX_GradeAppeals_status ON GradeAppeals(status);
+
 CREATE TABLE IF NOT EXISTS RubricCriteria (
     id SERIAL PRIMARY KEY,
     assignment_id INT NOT NULL REFERENCES Assignments(id) ON DELETE CASCADE,

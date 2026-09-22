@@ -29,6 +29,8 @@ const CourseManagementPage = lazy(() => import('@/pages/CourseManagementPage'))
 const LecturerStudentsPage = lazy(() => import('@/pages/LecturerStudentsPage'))
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
 const AnnouncementsPage = lazy(() => import('@/pages/AnnouncementsPage'))
+const AppealsPage = lazy(() => import('@/pages/AppealsPage'))
+const MyAppealsPage = lazy(() => import('@/pages/MyAppealsPage'))
 
 function PageFallback() {
   return <FullPageSpinner />
@@ -98,6 +100,12 @@ function AppContent() {
       } />
       <Route path="/submissions/:submissionId/grade" element={
         <ProtectedRoute><LecturerRoute><GradeSubmissionPage /></LecturerRoute></ProtectedRoute>
+      } />
+      <Route path="/appeals" element={
+        <ProtectedRoute><LecturerRoute><AppealsPage /></LecturerRoute></ProtectedRoute>
+      } />
+      <Route path="/my-appeals" element={
+        <ProtectedRoute><MyAppealsPage /></ProtectedRoute>
       } />
 
       <Route path="*" element={<Navigate to="/" replace />} />
