@@ -27,10 +27,11 @@ const navItems = [
   { icon: BookOpen, label: 'Courses', path: '/admin/courses', roles: ['admin'] },
   { icon: ClipboardList, label: 'Assignments', path: '/assignments', roles: ['student', 'lecturer'] },
   { icon: MessageSquareWarning, label: 'Appeals', path: '/appeals', roles: ['lecturer'] },
+  { icon: MessageSquareWarning, label: 'My Appeals', path: '/my-appeals', roles: ['student'] },
   { icon: UserPlus, label: 'Students', path: '/students', roles: ['lecturer'] },
-{ icon: Megaphone, label: 'Announcements', path: '/announcements', roles: ['student', 'lecturer', 'admin'] },
+  { icon: Megaphone, label: 'Announcements', path: '/announcements', roles: ['student', 'lecturer', 'admin'] },
   { icon: FileText, label: 'My Submissions', path: '/my-submissions', roles: ['student'] },
-  { icon: Settings, label: 'Profile', path: '/profile', roles: ['student', 'lecturer'] },
+  { icon: Settings, label: 'Profile', path: '/profile', roles: ['student', 'lecturer', 'admin'] },
 ]
 
 export default function Sidebar() {
@@ -109,7 +110,7 @@ export default function Sidebar() {
       {/* Mobile trigger bar */}
       <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-card px-4 lg:hidden">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
+          <Button variant="ghost" size="icon" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">

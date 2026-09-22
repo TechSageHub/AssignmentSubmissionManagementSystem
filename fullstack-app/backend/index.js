@@ -78,6 +78,11 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/appeals', appealRoutes);
 
+// Liveness probe — does not touch DB (skips SystemConfig)
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, uptime: process.uptime() });
+});
+
 // Public config endpoint (used by frontend for branding and ngrok URL)
 app.get('/api/config', async (_req, res, next) => {
   try {

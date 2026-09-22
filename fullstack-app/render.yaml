@@ -4,7 +4,7 @@ services:
     env: node
     buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
     startCommand: cd backend && node index.js
-    healthCheckPath: /api/config
+    healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: 22.x
