@@ -254,6 +254,17 @@ CREATE TABLE IF NOT EXISTS EmailOutbox (
 CREATE INDEX IF NOT EXISTS IX_EmailOutbox_due ON EmailOutbox(status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS IX_EmailOutbox_created ON EmailOutbox(created_at);
 
+-- Perf indexes (023)
+CREATE INDEX IF NOT EXISTS IX_Assignments_due_date ON Assignments(due_date);
+CREATE INDEX IF NOT EXISTS IX_Assignments_publish_date ON Assignments(publish_date);
+CREATE INDEX IF NOT EXISTS IX_Assignments_lecturer_due ON Assignments(lecturer_id, due_date);
+CREATE INDEX IF NOT EXISTS IX_Grades_released_at ON Grades(released_at);
+CREATE INDEX IF NOT EXISTS IX_Notifications_user_created ON Notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS IX_AuditLog_entity ON AuditLog(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS IX_Announcements_target ON Announcements(target_role, target_department, target_level);
+CREATE INDEX IF NOT EXISTS IX_Users_name_email ON Users(name, email);
+CREATE INDEX IF NOT EXISTS IX_StorageBlobs_created_at ON "StorageBlobs"("created_at");
+
 CREATE TABLE IF NOT EXISTS SystemConfig (
     key VARCHAR(100) PRIMARY KEY,
     value TEXT
