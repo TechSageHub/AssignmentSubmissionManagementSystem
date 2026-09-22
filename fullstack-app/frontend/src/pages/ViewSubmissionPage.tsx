@@ -285,6 +285,22 @@ export default function ViewSubmissionPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={appealOpen} onOpenChange={(open) => !open && setAppealOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Appeal Grade</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Explain why you are appealing this grade. Your lecturer will review it.</p>
+            <Textarea rows={4} value={appealReason} onChange={(e) => setAppealReason(e.target.value)} placeholder="Reason for appeal..." />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAppealOpen(false)}>Cancel</Button>
+            <Button onClick={handleAppeal} disabled={appealSaving}>{appealSaving ? 'Submitting...' : 'Submit Appeal'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   )
 }
