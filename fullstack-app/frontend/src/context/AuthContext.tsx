@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, type ReactNode } from 'react'
 import type { User, LoginCredentials, AuthResponse } from '@/types'
-import api from '@/services/api'
+import api, { clearApiCache } from '@/services/api'
 
 interface AuthContextType {
   user: User | null
@@ -22,13 +22,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('token')
     const storedUser = localStorage.getItem('user')
     if (storedToken && storedUser) {
-      setToken(storedToken)
-      setUser(JSON.parse(storedUser))
+      try {
+        setToken(storedToken)
+        setUser(JSON.parse(storedUser))
+      } catch {
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+      }
     }
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'token' || e.key === 'user') {
+        if (!localStorage.getItem('token')) {
+          clearApiCache()
+          setToken(null)
+          setUser(null)
+        }
+      }
+    }
+    window.addEventListener('storage', onStorage)
     setLoading(false)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   const login = async (credentials: LoginCredentials) => {
+    clearApiCache()
     const { data } = await api.post('/auth/login', credentials)
     const loggedInUser = {
       id: data.id, name: data.name, email: data.email, username: data.username,
@@ -51,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
+    clearApiCache()
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setToken(null)

@@ -13,7 +13,22 @@ const cacheTtlMs = 60_000
 function cacheKey(url?: string, params?: unknown) {
   if (!url) return ''
   if (!params) return url
-  return `${url}?${JSON.stringify(params)}`
+  if (typeof params === 'object' && params !== null) {
+    const entries = Object.entries(params as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .sort(([a], [b]) => a.localeCompare(b))
+    if (entries.length === 0) return url
+    const qs = new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString()
+    return `${url}?${qs}`
+  }
+  return `${url}?${String(params)}`
+}
+
+function baseResource(url?: string) {
+  if (!url) return ''
+  const clean = url.split('?')[0].replace(/^\/+/, '')
+  const first = clean.split('/')[0]
+  return first ? `/${first}` : ''
 }
 
 export function readApiCache<T>(url: string, params?: unknown): T | null {
@@ -51,7 +66,9 @@ api.interceptors.response.use(
     if (method === 'get' && url) {
       writeApiCache(url, response.data, response.config.params)
     } else if (method && ['post', 'put', 'patch', 'delete'].includes(method)) {
-      clearApiCache()
+      const resource = baseResource(url)
+      if (resource) clearApiCache(resource)
+      else clearApiCache()
     }
     return response
   },
@@ -59,6 +76,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const isLoginRequest = error.config?.url?.includes('/auth/login')
       if (!isLoginRequest) {
+        clearApiCache()
         localStorage.removeItem('token')
         localStorage.removeItem('user')
         window.location.href = '/login'
