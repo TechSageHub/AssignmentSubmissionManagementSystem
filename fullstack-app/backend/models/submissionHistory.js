@@ -10,6 +10,23 @@ async function findBySubmission(submissionId) {
   return result.recordset;
 }
 
+async function findBySubmissions(submissionIds) {
+  if (!submissionIds.length) return {};
+  const ids = submissionIds.map((_, i) => `@id${i}`).join(',');
+  const params = {};
+  submissionIds.forEach((id, i) => { params[`id${i}`] = id; });
+  const result = await query(
+    `SELECT * FROM SubmissionHistory WHERE submission_id IN (${ids}) ORDER BY submission_id, version_number ASC`,
+    params
+  );
+  const grouped = {};
+  for (const row of result.recordset) {
+    if (!grouped[row.submission_id]) grouped[row.submission_id] = [];
+    grouped[row.submission_id].push(row);
+  }
+  return grouped;
+}
+
 async function archive({ submissionId, filePath, originalName, isLate, submittedAt, filesJson }) {
   const result = await query(
     `INSERT INTO SubmissionHistory (submission_id, version_number, file_path, original_name, is_late, submitted_at, files_json)
@@ -22,4 +39,4 @@ async function archive({ submissionId, filePath, originalName, isLate, submitted
   return result.recordset[0];
 }
 
-module.exports = { findBySubmission, archive };
+module.exports = { findBySubmission, findBySubmissions, archive };

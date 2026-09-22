@@ -28,6 +28,23 @@ async function findBySubmission(submissionId) {
   return result.recordset;
 }
 
+async function findBySubmissions(submissionIds) {
+  if (!submissionIds.length) return {};
+  const ids = submissionIds.map((_, i) => `@id${i}`).join(',');
+  const params = {};
+  submissionIds.forEach((id, i) => { params[`id${i}`] = id; });
+  const result = await query(
+    `SELECT * FROM SubmissionFiles WHERE submission_id IN (${ids}) ORDER BY submission_id, id`,
+    params
+  );
+  const grouped = {};
+  for (const row of result.recordset) {
+    if (!grouped[row.submission_id]) grouped[row.submission_id] = [];
+    grouped[row.submission_id].push(row);
+  }
+  return grouped;
+}
+
 async function findById(id) {
   const result = await query('SELECT * FROM SubmissionFiles WHERE id = @id', { id });
   return result.recordset[0] || null;
@@ -37,4 +54,4 @@ async function removeBySubmission(submissionId) {
   await query('DELETE FROM SubmissionFiles WHERE submission_id = @submissionId', { submissionId });
 }
 
-module.exports = { createMany, findBySubmission, findById, removeBySubmission };
+module.exports = { createMany, findBySubmission, findBySubmissions, findById, removeBySubmission };

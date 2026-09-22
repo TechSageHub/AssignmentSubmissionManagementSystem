@@ -245,10 +245,13 @@ async function getSubmissionsByAssignment(req, res, next) {
       : { items: await submissionModel.findByAssignment(assignmentId), total: null };
     const submissions = paginated.items;
     const ids = submissions.map(s => s.id);
-    const grouped = await groupMemberModel.findBySubmissions(ids);
+    const [grouped, historyMap] = await Promise.all([
+      groupMemberModel.findBySubmissions(ids),
+      submissionHistoryModel.findBySubmissions(ids),
+    ]);
     for (const sub of submissions) {
       sub.group_members = grouped[sub.id] || [];
-      sub.history = await submissionHistoryModel.findBySubmission(sub.id);
+      sub.history = historyMap[sub.id] || [];
     }
     if (hasPagination) {
       return res.json({ items: submissions, total: paginated.total, limit, offset });
@@ -285,28 +288,36 @@ async function getMySubmissions(req, res, next) {
       const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
       const paginated = await submissionModel.findByStudentPaginated(req.user.id, { limit, offset, search });
       const ids = paginated.items.map(s => s.id);
-      const grouped = await groupMemberModel.findBySubmissions(ids);
+      const [grouped, filesMap, historyMap] = await Promise.all([
+        groupMemberModel.findBySubmissions(ids),
+        submissionFileModel.findBySubmissions(ids),
+        submissionHistoryModel.findBySubmissions(ids),
+      ]);
       for (const sub of paginated.items) {
         sub.group_members = grouped[sub.id] || [];
         if (sub.due_date != null) {
           sub.due_date = toIsoUtc(sub.due_date);
         }
-        sub.files = await submissionFileModel.findBySubmission(sub.id);
-        sub.history = await submissionHistoryModel.findBySubmission(sub.id);
+        sub.files = filesMap[sub.id] || [];
+        sub.history = historyMap[sub.id] || [];
         applyGradeReleaseGate(sub);
       }
       return res.json({ items: paginated.items, total: paginated.total, limit, offset });
     }
     const submissions = await submissionModel.findByStudent(req.user.id);
     const ids = submissions.map(s => s.id);
-    const grouped = await groupMemberModel.findBySubmissions(ids);
+    const [grouped, filesMap, historyMap] = await Promise.all([
+      groupMemberModel.findBySubmissions(ids),
+      submissionFileModel.findBySubmissions(ids),
+      submissionHistoryModel.findBySubmissions(ids),
+    ]);
     for (const sub of submissions) {
       sub.group_members = grouped[sub.id] || [];
       if (sub.due_date != null) {
         sub.due_date = toIsoUtc(sub.due_date);
       }
-      sub.files = await submissionFileModel.findBySubmission(sub.id);
-      sub.history = await submissionHistoryModel.findBySubmission(sub.id);
+      sub.files = filesMap[sub.id] || [];
+      sub.history = historyMap[sub.id] || [];
       applyGradeReleaseGate(sub);
     }
     res.json(submissions);
