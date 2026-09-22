@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: fullstack-app/backend/package-lock.json
+      - run: npm ci
+        working-directory: fullstack-app/backend
+      - name: Backend unit tests
+        working-directory: fullstack-app/backend
+        env:
+          DB_TYPE: mssql
+          DB_SERVER: localhost
+          DB_DATABASE: test
+          DB_USER: sa
+          DB_PASSWORD: Test123!
+          JWT_SECRET: ci-test-secret
+          EMAIL_FROM: ci@test.local
+          EMAIL_PASSWORD: ci
+          EMAIL_HOST: smtp.test.local
+        run: node --test
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: fullstack-app/frontend/package-lock.json
+      - run: npm ci
+        working-directory: fullstack-app/frontend
+      - run: npm test
+        working-directory: fullstack-app/frontend
+      - run: npm run build
+        working-directory: fullstack-app/frontend
