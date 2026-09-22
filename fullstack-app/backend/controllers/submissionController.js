@@ -236,12 +236,22 @@ async function getSubmissionsByAssignment(req, res, next) {
       return res.status(403).json({ error: 'AuthorizationError', details: 'Not your assignment' });
     }
 
-    const submissions = await submissionModel.findByAssignment(assignmentId);
+    const hasPagination = req.query.limit !== undefined || req.query.offset !== undefined || req.query.search !== undefined;
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const paginated = hasPagination
+      ? await submissionModel.findByAssignmentPaginated(assignmentId, { limit, offset, search })
+      : { items: await submissionModel.findByAssignment(assignmentId), total: null };
+    const submissions = paginated.items;
     const ids = submissions.map(s => s.id);
     const grouped = await groupMemberModel.findBySubmissions(ids);
     for (const sub of submissions) {
       sub.group_members = grouped[sub.id] || [];
       sub.history = await submissionHistoryModel.findBySubmission(sub.id);
+    }
+    if (hasPagination) {
+      return res.json({ items: submissions, total: paginated.total, limit, offset });
     }
     res.json(submissions);
   } catch (err) {
@@ -251,6 +261,14 @@ async function getSubmissionsByAssignment(req, res, next) {
 
 async function getAllSubmissions(req, res, next) {
   try {
+    const hasPagination = req.query.limit !== undefined || req.query.offset !== undefined || req.query.search !== undefined;
+    if (hasPagination) {
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const paginated = await submissionModel.findAllPaginated(req.user.id, { limit, offset, search });
+      return res.json({ items: paginated.items, total: paginated.total, limit, offset });
+    }
     const submissions = await submissionModel.findAll(req.user.id);
     res.json(submissions);
   } catch (err) {
@@ -260,6 +278,25 @@ async function getAllSubmissions(req, res, next) {
 
 async function getMySubmissions(req, res, next) {
   try {
+    const hasPagination = req.query.limit !== undefined || req.query.offset !== undefined || req.query.search !== undefined;
+    if (hasPagination) {
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const paginated = await submissionModel.findByStudentPaginated(req.user.id, { limit, offset, search });
+      const ids = paginated.items.map(s => s.id);
+      const grouped = await groupMemberModel.findBySubmissions(ids);
+      for (const sub of paginated.items) {
+        sub.group_members = grouped[sub.id] || [];
+        if (sub.due_date != null) {
+          sub.due_date = toIsoUtc(sub.due_date);
+        }
+        sub.files = await submissionFileModel.findBySubmission(sub.id);
+        sub.history = await submissionHistoryModel.findBySubmission(sub.id);
+        applyGradeReleaseGate(sub);
+      }
+      return res.json({ items: paginated.items, total: paginated.total, limit, offset });
+    }
     const submissions = await submissionModel.findByStudent(req.user.id);
     const ids = submissions.map(s => s.id);
     const grouped = await groupMemberModel.findBySubmissions(ids);

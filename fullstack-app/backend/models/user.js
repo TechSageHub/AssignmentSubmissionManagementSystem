@@ -308,29 +308,52 @@ async function findStudentsForAssignment({ department, targetLevel }) {
 }
 
 async function findStudentsByDepartment(department, levelScope) {
-  let result;
-  if (department && department.trim()) {
-    result = await query(
-      `SELECT id, name, email, department, level, programme, student_id, phone, created_at FROM Users
-       WHERE role = 'student'
-         AND (is_active = 1 OR is_active IS NULL)
-         AND LOWER(LTRIM(RTRIM(department))) = LOWER(LTRIM(RTRIM(@department)))
-       ORDER BY name ASC`,
-      { department: department.trim() }
-    );
-  } else {
-    result = await query(
-      `SELECT id, name, email, department, level, programme, student_id, phone, created_at FROM Users
-       WHERE role = 'student' AND (is_active = 1 OR is_active IS NULL)
-       ORDER BY name ASC`
-    );
-  }
+  const paginated = await findStudentsByDepartmentPaginated(department, levelScope, {});
+  return paginated.items;
+}
 
+async function findStudentsByDepartmentPaginated(department, levelScope, { limit, offset, search } = {}) {
+  const hasPagination = Number.isInteger(limit) || Number.isInteger(offset) || (typeof search === 'string' && search.length > 0);
+  const limitVal = hasPagination ? Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200) : null;
+  const offsetVal = hasPagination ? Math.max(parseInt(offset, 10) || 0, 0) : null;
+  const searchTerm = typeof search === 'string' ? search.trim() : '';
+  const params = {};
+  let whereDept = '';
+  if (department && department.trim()) {
+    whereDept = 'AND LOWER(LTRIM(RTRIM(department))) = LOWER(LTRIM(RTRIM(@department)))';
+    params.department = department.trim();
+  }
+  let whereSearch = '';
+  if (searchTerm) {
+    whereSearch = 'AND (name LIKE @search OR email LIKE @search)';
+    params.search = `%${searchTerm}%`;
+  }
+  const whereBase = `WHERE role = 'student' AND (is_active = 1 OR is_active IS NULL) ${whereDept} ${whereSearch}`;
+  if (!hasPagination) {
+    const result = await query(
+      `SELECT id, name, email, department, level, programme, student_id, phone, created_at FROM Users ${whereBase} ORDER BY name ASC, id ASC`,
+      params
+    );
+    let items = result.recordset;
+    if (levelScope) {
+      const { isTargetLevelAllowed } = require('../utils/academic');
+      items = items.filter(student => isTargetLevelAllowed(levelScope, student.level));
+    }
+    return { items, total: items.length, limit: items.length, offset: 0 };
+  }
+  const countResult = await query(`SELECT COUNT(*) AS count FROM Users ${whereBase}`, params);
+  params.limit = limitVal;
+  params.offset = offsetVal;
+  const result = await query(
+    `SELECT id, name, email, department, level, programme, student_id, phone, created_at FROM Users ${whereBase} ORDER BY name ASC, id ASC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`,
+    params
+  );
+  let items = result.recordset;
   if (levelScope) {
     const { isTargetLevelAllowed } = require('../utils/academic');
-    return result.recordset.filter(student => isTargetLevelAllowed(levelScope, student.level));
+    items = items.filter(student => isTargetLevelAllowed(levelScope, student.level));
   }
-  return result.recordset;
+  return { items, total: Number(countResult.recordset[0].count), limit: limitVal, offset: offsetVal };
 }
 
 module.exports = {
@@ -356,4 +379,5 @@ module.exports = {
   updateProfile,
   findStudentsForAssignment,
   findStudentsByDepartment,
+  findStudentsByDepartmentPaginated,
 };

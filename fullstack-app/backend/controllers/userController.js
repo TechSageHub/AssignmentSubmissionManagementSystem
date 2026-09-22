@@ -85,6 +85,19 @@ After verification, you will be asked to set your own password on first login.
 
 async function getStudents(req, res, next) {
   try {
+    const hasPagination = req.query.limit !== undefined || req.query.offset !== undefined || req.query.search !== undefined;
+    if (hasPagination) {
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      if (req.user.role === 'lecturer' && req.user.department) {
+        const paginated = await userModel.findStudentsByDepartmentPaginated(req.user.department, req.user.level_scope, { limit, offset, search });
+        return res.json({ items: paginated.items, total: paginated.total, limit, offset });
+      }
+      // Fallback: paginate findAllStudents via filtered query (admin view)
+      const paginated = await userModel.findStudentsByDepartmentPaginated(null, null, { limit, offset, search });
+      return res.json({ items: paginated.items, total: paginated.total, limit, offset });
+    }
     if (req.user.role === 'lecturer' && req.user.department) {
       const students = await userModel.findStudentsByDepartment(req.user.department, req.user.level_scope);
       return res.json(students);
